@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 type Props = {
   disabled: boolean;
   channelName: string;
+  isDm: boolean;
   error: string | null;
   onClearError: () => void;
   onSend: (body: string) => void;
@@ -17,11 +18,13 @@ const MAX_HEIGHT = 160;
 export default function Composer({
   disabled,
   channelName,
+  isDm,
   error,
   onClearError,
   onSend,
   onTyping,
 }: Props) {
+  const target = isDm ? channelName : `#${channelName}`;
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -82,11 +85,9 @@ export default function Composer({
             }}
             onKeyDown={handleKeyDown}
             placeholder={
-              disabled
-                ? "Select a channel to start chatting"
-                : `Message #${channelName}`
+              disabled ? "Select a channel to start chatting" : `Message ${target}`
             }
-            aria-label={`Message #${channelName}`}
+            aria-label={`Message ${target}`}
             className="scroll-thin max-h-40 min-h-[24px] flex-1 resize-none bg-transparent text-sm text-ink placeholder:text-ink-3 focus:outline-none disabled:cursor-not-allowed"
           />
           <button

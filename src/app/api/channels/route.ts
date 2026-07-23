@@ -17,7 +17,13 @@ type ChannelRow = {
 };
 
 function serialize(c: ChannelRow): SerializedChannel {
-  return { id: c.id, slug: c.slug, name: c.name, description: c.description };
+  return {
+    id: c.id,
+    slug: c.slug,
+    name: c.name,
+    description: c.description,
+    isDm: false,
+  };
 }
 
 // #general always sorts first; everything else alphabetically.
@@ -33,7 +39,7 @@ export async function GET() {
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
 
-  const channels = await prisma.channel.findMany();
+  const channels = await prisma.channel.findMany({ where: { isDm: false } });
   return NextResponse.json({ channels: orderChannels(channels).map(serialize) });
 }
 

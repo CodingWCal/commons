@@ -6,6 +6,7 @@ import { assertSameOrigin } from "@/lib/security";
 import { isReactionEmoji } from "@/lib/reactions";
 import { aggregateReactions } from "@/lib/serialize";
 import { allowReaction } from "@/lib/rate-guard";
+import { channelAudience, isChannelMember } from "@/lib/dm";
 
 export const runtime = "nodejs";
 
@@ -45,8 +46,14 @@ export async function POST(
     );
   }
 
-  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { channel: true },
+  });
   if (!message || message.deletedAt) {
+    return NextResponse.json({ error: "Message not found" }, { status: 404 });
+  }
+  if (message.channel.isDm && !(await isChannelMember(user.id, message.channelId))) {
     return NextResponse.json({ error: "Message not found" }, { status: 404 });
   }
 
@@ -62,6 +69,13 @@ export async function POST(
 
   const rows = await prisma.reaction.findMany({ where: { messageId } });
   const reactions = aggregateReactions(rows);
-  publish({ type: "reaction", channelId: message.channelId, messageId, reactions });
+  const audience = await channelAudience(message.channel);
+  publish({
+    type: "reaction",
+    channelId: message.channelId,
+    messageId,
+    reactions,
+    ...(audience ? { audience } : {}),
+  });
   return NextResponse.json({ reactions });
 }

@@ -25,6 +25,9 @@ database. No accounts, no API keys, no external services required to run it.
 - 😀 **Reactions** — toggle emoji reactions; counts update live for everyone.
 - 🛡️ **Moderation & roles** — the first member becomes admin; authors delete
   their own messages, admins delete any (soft delete, removed live).
+- ✉️ **Direct messages** — private 1:1 conversations (membership-enforced,
+  audience-scoped so only the two participants receive them). Start one by
+  clicking someone in the online list.
 - 🔎 **Search** — find past messages by content, jump to the channel.
 - 🎟️ **Invite gating (optional)** — set `COMMONS_INVITE_CODE` to require a code
   at signup.

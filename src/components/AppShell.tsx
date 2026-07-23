@@ -23,6 +23,7 @@ type TypingMap = Record<string, Record<string, { user: SerializedUser; at: numbe
 type Props = {
   currentUser: CurrentUser;
   channels: SerializedChannel[];
+  dms: SerializedChannel[];
   initialActiveChannelId: string | null;
   initialMessages: SerializedMessage[];
   initialHasMore: boolean;
@@ -51,6 +52,7 @@ function mergeIncoming(
 export default function AppShell({
   currentUser,
   channels: initialChannels,
+  dms: initialDms,
   initialActiveChannelId,
   initialMessages,
   initialHasMore,
@@ -60,6 +62,7 @@ export default function AppShell({
   const isAdmin = currentUser.role === "admin";
 
   const [channels, setChannels] = useState<SerializedChannel[]>(initialChannels);
+  const [dms, setDms] = useState<SerializedChannel[]>(initialDms);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(
     initialActiveChannelId,
   );
@@ -84,19 +87,21 @@ export default function AppShell({
   );
   const tempIdRef = useRef(0);
   const activeIdRef = useRef<string | null>(initialActiveChannelId);
-  const channelsRef = useRef<SerializedChannel[]>(initialChannels);
+  // Ref tracks BOTH public channels and DMs, for slug/id lookups in the
+  // stream handler, popstate, and search-jump.
+  const channelsRef = useRef<SerializedChannel[]>([...initialChannels, ...initialDms]);
   const typingThrottle = useRef(0);
 
   useEffect(() => {
     activeIdRef.current = activeChannelId;
   }, [activeChannelId]);
   useEffect(() => {
-    channelsRef.current = channels;
-  }, [channels]);
+    channelsRef.current = [...channels, ...dms];
+  }, [channels, dms]);
 
   const activeChannel = useMemo(
-    () => channels.find((c) => c.id === activeChannelId) ?? null,
-    [channels, activeChannelId],
+    () => [...channels, ...dms].find((c) => c.id === activeChannelId) ?? null,
+    [channels, dms, activeChannelId],
   );
 
   // ---- Real-time stream (opened once) ------------------------------------
@@ -110,6 +115,16 @@ export default function AppShell({
         (e as MessageEvent).data,
       ) as { channelId: string; message: SerializedMessage; nonce?: string };
       setMessagesByChannel((prev) => mergeIncoming(prev, channelId, message, nonce));
+      // A message for a channel we don't know about is a DM someone just
+      // started with us — load our DM list so it appears.
+      if (!channelsRef.current.some((c) => c.id === channelId)) {
+        fetch("/api/dms")
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d: { dms?: SerializedChannel[] } | null) => {
+            if (d?.dms) setDms(d.dms);
+          })
+          .catch(() => {});
+      }
       if (message.user.id !== currentUser.id && channelId !== activeIdRef.current) {
         setUnread((prev) => ({ ...prev, [channelId]: (prev[channelId] ?? 0) + 1 }));
       }
@@ -453,6 +468,28 @@ export default function AppShell({
     [selectChannel],
   );
 
+  const startDm = useCallback(
+    async (userId: string) => {
+      if (userId === currentUser.id) return;
+      try {
+        const res = await fetch("/api/dms", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
+        if (!res.ok) return;
+        const { channel } = (await res.json()) as { channel: SerializedChannel };
+        setDms((prev) =>
+          prev.some((d) => d.id === channel.id) ? prev : [channel, ...prev],
+        );
+        await selectChannel(channel);
+      } catch {
+        // ignore
+      }
+    },
+    [currentUser.id, selectChannel],
+  );
+
   const logout = useCallback(
     async (scope: "current" | "all" = "current") => {
       await fetch("/api/auth/logout", {
@@ -478,11 +515,13 @@ export default function AppShell({
       <Sidebar
         currentUser={currentUser}
         channels={channels}
+        dms={dms}
         activeChannelId={activeChannelId}
         online={online}
         unread={unread}
         open={sidebarOpen}
         onSelectChannel={selectChannel}
+        onStartDm={startDm}
         onNewChannel={() => setDialogOpen(true)}
         onOpenSearch={() => setSearchOpen(true)}
         onClose={() => setSidebarOpen(false)}
@@ -502,13 +541,17 @@ export default function AppShell({
           {activeChannel ? (
             <div className="min-w-0">
               <h1 className="flex items-center gap-1 truncate text-base font-semibold text-ink">
-                <span className="text-ink-3">#</span>
+                {!activeChannel.isDm && <span className="text-ink-3">#</span>}
                 {activeChannel.name}
               </h1>
-              {activeChannel.description && (
-                <p className="truncate text-xs text-ink-2">
-                  {activeChannel.description}
-                </p>
+              {activeChannel.isDm ? (
+                <p className="truncate text-xs text-ink-2">Direct message</p>
+              ) : (
+                activeChannel.description && (
+                  <p className="truncate text-xs text-ink-2">
+                    {activeChannel.description}
+                  </p>
+                )
               )}
             </div>
           ) : (
@@ -543,8 +586,9 @@ export default function AppShell({
         <MessageList
           messages={messages}
           currentUserId={currentUser.id}
-          isAdmin={isAdmin}
+          isAdmin={isAdmin && !activeChannel?.isDm}
           channelName={activeChannel?.name ?? ""}
+          isDm={activeChannel?.isDm ?? false}
           hasMore={activeChannel ? (hasMoreByChannel[activeChannel.id] ?? false) : false}
           loadingOlder={loadingOlder}
           onLoadOlder={loadOlder}
@@ -558,6 +602,7 @@ export default function AppShell({
         <Composer
           disabled={!activeChannel}
           channelName={activeChannel?.name ?? ""}
+          isDm={activeChannel?.isDm ?? false}
           error={sendError}
           onClearError={() => setSendError(null)}
           onSend={sendMessage}

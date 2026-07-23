@@ -62,6 +62,42 @@ test("a new channel broadcasts live to other users", async ({ browser }) => {
   await ctxB.close();
 });
 
+test("direct messages are private and delivered in real time", async ({ browser }) => {
+  const ctxA = await browser.newContext();
+  const ctxB = await browser.newContext();
+  const ctxC = await browser.newContext();
+  const alice = await ctxA.newPage();
+  const bob = await ctxB.newPage();
+  const carol = await ctxC.newPage();
+
+  const bobName = `Bob ${RUN}`;
+  await signup(alice, `Alice ${RUN}`, `alice+${RUN}@example.com`);
+  await signup(bob, bobName, `bob+${RUN}@example.com`);
+  await signup(carol, `Carol ${RUN}`, `carol+${RUN}@example.com`);
+
+  // Alice starts a DM with Bob from the presence list.
+  await alice.getByTitle(`Message ${bobName}`).click();
+  const dmText = `secret for bob ${RUN}`;
+  const composer = alice.getByRole("textbox", { name: `Message ${bobName}` });
+  await expect(composer).toBeVisible();
+  await composer.fill(dmText);
+  await alice.getByRole("button", { name: "Send message" }).click();
+  await expect(alice.getByText(dmText)).toBeVisible();
+
+  // Bob receives the DM live: it shows up in his sidebar and opens to the message.
+  await expect(bob.getByTestId("dm-item")).toHaveCount(1, { timeout: 10_000 });
+  await bob.getByTestId("dm-item").click();
+  await expect(bob.getByText(dmText)).toBeVisible({ timeout: 10_000 });
+
+  // Carol (not a participant) never receives it — no DM, no message.
+  await expect(carol.getByTestId("dm-item")).toHaveCount(0);
+  await expect(carol.getByText(dmText)).toHaveCount(0);
+
+  await ctxA.close();
+  await ctxB.close();
+  await ctxC.close();
+});
+
 test("messages persist across a reload", async ({ page }) => {
   await signup(page, "Persist User", `persist+${RUN}@example.com`);
 

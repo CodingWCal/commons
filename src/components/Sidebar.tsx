@@ -8,11 +8,13 @@ import type { CurrentUser, SerializedChannel, SerializedUser } from "./chat-type
 type Props = {
   currentUser: CurrentUser;
   channels: SerializedChannel[];
+  dms: SerializedChannel[];
   activeChannelId: string | null;
   online: SerializedUser[];
   unread: Record<string, number>;
   open: boolean;
   onSelectChannel: (channel: SerializedChannel) => void;
+  onStartDm: (userId: string) => void;
   onNewChannel: () => void;
   onOpenSearch: () => void;
   onClose: () => void;
@@ -22,16 +24,19 @@ type Props = {
 export default function Sidebar({
   currentUser,
   channels,
+  dms,
   activeChannelId,
   online,
   unread,
   open,
   onSelectChannel,
+  onStartDm,
   onNewChannel,
   onOpenSearch,
   onClose,
   onLogout,
 }: Props) {
+  const onlineIds = new Set(online.map((u) => u.id));
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -129,6 +134,55 @@ export default function Sidebar({
             })}
           </ul>
 
+          {/* Direct messages */}
+          <div className="mb-1 mt-6 px-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-ink-3">
+              Direct messages
+            </span>
+          </div>
+          <ul className="space-y-0.5">
+            {dms.length === 0 && (
+              <li className="px-2 py-1 text-xs text-ink-3">
+                Pick someone below to start a DM.
+              </li>
+            )}
+            {dms.map((dm) => {
+              const isActive = dm.id === activeChannelId;
+              const count = unread[dm.id] ?? 0;
+              const partnerOnline = dm.partner ? onlineIds.has(dm.partner.id) : false;
+              return (
+                <li key={dm.id}>
+                  <button
+                    type="button"
+                    data-testid="dm-item"
+                    onClick={() => onSelectChannel(dm)}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors ${
+                      isActive
+                        ? "bg-commons-soft font-medium text-commons-strong"
+                        : "text-ink-2 hover:bg-paper-3 hover:text-ink"
+                    }`}
+                  >
+                    {dm.partner && (
+                      <Avatar
+                        name={dm.partner.displayName}
+                        color={dm.partner.avatarColor}
+                        size={20}
+                        online={partnerOnline}
+                      />
+                    )}
+                    <span className="truncate">{dm.name}</span>
+                    {count > 0 && !isActive && (
+                      <span className="ml-auto rounded-full bg-brick px-1.5 text-xs font-semibold text-white">
+                        {count > 99 ? "99+" : count}
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+
           {/* Presence */}
           <div className="mb-1 mt-6 px-2">
             <span className="text-xs font-semibold uppercase tracking-wide text-ink-3">
@@ -139,20 +193,41 @@ export default function Sidebar({
             {online.length === 0 && (
               <li className="px-2 py-1 text-xs text-ink-3">No one else is here yet.</li>
             )}
-            {online.map((user) => (
-              <li
-                key={user.id}
-                className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-ink-2"
-              >
-                <Avatar name={user.displayName} color={user.avatarColor} size={22} online />
-                <span className="truncate">
-                  {user.displayName}
-                  {user.id === currentUser.id && (
-                    <span className="text-ink-3"> (you)</span>
+            {online.map((user) => {
+              const isSelf = user.id === currentUser.id;
+              const inner = (
+                <>
+                  <Avatar
+                    name={user.displayName}
+                    color={user.avatarColor}
+                    size={22}
+                    online
+                  />
+                  <span className="truncate">
+                    {user.displayName}
+                    {isSelf && <span className="text-ink-3"> (you)</span>}
+                  </span>
+                </>
+              );
+              return (
+                <li key={user.id}>
+                  {isSelf ? (
+                    <div className="flex items-center gap-2 rounded-md px-2 py-1 text-sm text-ink-2">
+                      {inner}
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onStartDm(user.id)}
+                      title={`Message ${user.displayName}`}
+                      className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-ink-2 hover:bg-paper-3 hover:text-ink"
+                    >
+                      {inner}
+                    </button>
                   )}
-                </span>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         </nav>
 

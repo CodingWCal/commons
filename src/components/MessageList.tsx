@@ -9,6 +9,7 @@ type Props = {
   currentUserId: string;
   isAdmin: boolean;
   channelName: string;
+  isDm: boolean;
   hasMore: boolean;
   loadingOlder: boolean;
   onLoadOlder: () => void;
@@ -36,6 +37,7 @@ export default function MessageList({
   currentUserId,
   isAdmin,
   channelName,
+  isDm,
   hasMore,
   loadingOlder,
   onLoadOlder,
@@ -43,6 +45,7 @@ export default function MessageList({
   onDelete,
   onRetry,
 }: Props) {
+  const label = isDm ? channelName : `#${channelName}`;
   const containerRef = useRef<HTMLDivElement>(null);
   const wantBottom = useRef(true);
   const prevFirstId = useRef<number | null>(null);
@@ -102,7 +105,11 @@ export default function MessageList({
       <div className="scroll-thin flex flex-1 items-center justify-center overflow-y-auto p-6">
         <div className="text-center">
           <p className="text-lg font-medium text-ink">
-            {channelName ? `Welcome to #${channelName}` : "No channel selected"}
+            {!channelName
+              ? "No channel selected"
+              : isDm
+                ? `This is the start of your conversation with ${channelName}`
+                : `Welcome to #${channelName}`}
           </p>
           <p className="mt-1 text-sm text-ink-2">
             {channelName
@@ -120,7 +127,7 @@ export default function MessageList({
       onScroll={handleScroll}
       className="scroll-thin flex-1 overflow-y-auto px-4 py-4"
       aria-live="polite"
-      aria-label={`Messages in ${channelName}`}
+      aria-label={`Messages in ${label}`}
     >
       <div className="mx-auto max-w-3xl">
         {loadingOlder && (
@@ -128,7 +135,9 @@ export default function MessageList({
         )}
         {!hasMore && (
           <p className="py-2 text-center text-xs text-ink-3">
-            This is the beginning of #{channelName}.
+            {isDm
+              ? `This is the beginning of your conversation with ${channelName}.`
+              : `This is the beginning of #${channelName}.`}
           </p>
         )}
 

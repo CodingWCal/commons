@@ -18,12 +18,13 @@ model User {
   displayName  String
   passwordHash String
   avatarColor  String     @default("#3F7D5B")
-  role         String     @default("member") // "member" | "admin"
-  createdAt    DateTime   @default(now())
+  role         String       @default("member") // "member" | "admin"
+  createdAt    DateTime     @default(now())
   sessions     Session[]
   messages     Message[]
-  channels     Channel[]  @relation("ChannelCreatedBy")
+  channels     Channel[]    @relation("ChannelCreatedBy")
   reactions    Reaction[]
+  memberships  Membership[]
 }
 
 model Session {
@@ -38,14 +39,28 @@ model Session {
 }
 
 model Channel {
-  id          String    @id @default(cuid())
-  slug        String    @unique
+  id          String       @id @default(cuid())
+  slug        String       @unique
   name        String
   description String?
+  isDm        Boolean      @default(false)
   createdById String?
-  createdBy   User?     @relation("ChannelCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime  @default(now())
+  createdBy   User?        @relation("ChannelCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
   messages    Message[]
+  members     Membership[]
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channelId String
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, channelId])
+  @@index([channelId])
 }
 
 model Message {

@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { onlineUsers } from "@/lib/presence";
 import { serializeMessage } from "@/lib/serialize";
+import { serializeDmForViewer } from "@/lib/dm";
 import AppShell from "@/components/AppShell";
 import type { SerializedChannel, SerializedMessage } from "@/lib/types";
 
@@ -26,18 +27,28 @@ export default async function HomePage({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const channelRows = await prisma.channel.findMany();
+  const channelRows = await prisma.channel.findMany({ where: { isDm: false } });
   const channels: SerializedChannel[] = orderChannels(channelRows).map((c) => ({
     id: c.id,
     slug: c.slug,
     name: c.name,
     description: c.description,
+    isDm: false,
   }));
 
-  // Deep-link: open the channel named in ?c=slug, else the first channel.
+  const dmRows = await prisma.channel.findMany({
+    where: { isDm: true, members: { some: { userId: user.id } } },
+    include: { members: { include: { user: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+  const dms: SerializedChannel[] = dmRows.map((c) => serializeDmForViewer(c, user.id));
+
+  // Deep-link: open the channel/DM named in ?c=slug, else the first channel.
   const { c } = await searchParams;
   const active =
-    (c ? channels.find((ch) => ch.slug === c) : undefined) ?? channels[0] ?? null;
+    (c ? [...channels, ...dms].find((ch) => ch.slug === c) : undefined) ??
+    channels[0] ??
+    null;
 
   let initialMessages: SerializedMessage[] = [];
   let initialHasMore = false;
@@ -62,6 +73,7 @@ export default async function HomePage({
         role: user.role === "admin" ? "admin" : "member",
       }}
       channels={channels}
+      dms={dms}
       initialActiveChannelId={active?.id ?? null}
       initialMessages={initialMessages}
       initialHasMore={initialHasMore}

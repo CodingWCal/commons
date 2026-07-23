@@ -61,6 +61,10 @@ export async function GET(req: Request) {
 
       // Subscribe first so nothing published during backfill is lost.
       unsubscribe = subscribe((event: BusEvent) => {
+        // Scoped (private/DM) events only reach their audience.
+        const audience = (event as { audience?: string[] }).audience;
+        if (audience && !audience.includes(me.id)) return;
+
         if (event.type === "message") {
           sendMessage(event.channelId, event.message, event.nonce);
         } else if (event.type === "message-delete") {
@@ -86,7 +90,15 @@ export async function GET(req: Request) {
       // Backfill messages missed while disconnected (skip deleted).
       if (lastEventId > 0) {
         const missed = await prisma.message.findMany({
-          where: { id: { gt: lastEventId }, deletedAt: null },
+          where: {
+            id: { gt: lastEventId },
+            deletedAt: null,
+            // Never replay private DM messages to a non-member.
+            OR: [
+              { channel: { isDm: false } },
+              { channel: { members: { some: { userId: me.id } } } },
+            ],
+          },
           orderBy: { id: "asc" },
           take: BACKFILL_LIMIT,
           include: { user: true, reactions: true },

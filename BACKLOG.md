@@ -11,10 +11,11 @@ creation, presence, validation/negative paths, rate limiting).
 > 013, 015, 018, 019, 020 (12 tickets). Plus a final-QA hardening pass: added
 > server-side rate limits to the typing + reaction endpoints, rolled back failed
 > optimistic deletes, and made first-user-admin assignment race-safe (transaction).
-> All verified live and/or by the Playwright suite (build + lint + 13 unit + 9 e2e).
-> **Still blocked on infra** (need a DB/Redis/object-store/Sentry): 001 Postgres,
-> 002 durable pub/sub, 008 distributed rate limit, 012 file uploads, 014
-> observability. **Remaining unblocked:** 009 DMs (invasive), 016 (monitor), 017.
+> Plus TICKET-009 direct messages (private 1:1, membership-enforced, audience-scoped
+> SSE). All verified live and/or by the Playwright suite (build + lint + 13 unit +
+> 10 e2e). **Still blocked on infra** (need a DB/Redis/object-store/Sentry): 001
+> Postgres, 002 durable pub/sub, 008 distributed rate limit, 012 file uploads, 014
+> observability. **Remaining unblocked:** 016 (monitor-only), 017 (risky, cosmetic).
 
 ## Product Intent Snapshot
 
@@ -323,6 +324,8 @@ creation, presence, validation/negative paths, rate limiting).
   > Implement TICKET-008 per repository context; keep the interface stable, report results.
 
 ### TICKET-009: Direct messages (1:1)
+
+> ✅ **Done** — a DM is a `Channel` with `isDm=true` + a 2-row `Membership`; `/api/dms` opens/lists conversations, membership is enforced on every read/write, and SSE events carry an `audience` so private events (and reconnect backfill) reach only the two participants. Start a DM by clicking someone in the presence list; DMs are excluded from the public channel list + search. Verified by a 3-user Playwright test (delivered live to the participant, invisible to a third user).
 
 - Priority: P2
 - Type: Feature

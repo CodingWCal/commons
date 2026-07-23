@@ -6,6 +6,7 @@ import { publish } from "@/lib/bus";
 import { allowMessage } from "@/lib/rate-guard";
 import { assertSameOrigin } from "@/lib/security";
 import { serializeMessage } from "@/lib/serialize";
+import { channelAudience, isChannelMember } from "@/lib/dm";
 
 export const runtime = "nodejs";
 
@@ -29,6 +30,10 @@ export async function GET(
   const { slug } = await params;
   const channel = await getChannel(slug);
   if (!channel) {
+    return NextResponse.json({ error: "Channel not found" }, { status: 404 });
+  }
+  // Private DM: only members may read (404, not 403, to avoid disclosing it).
+  if (channel.isDm && !(await isChannelMember(auth.user.id, channel.id))) {
     return NextResponse.json({ error: "Channel not found" }, { status: 404 });
   }
 
@@ -86,6 +91,9 @@ export async function POST(
   if (!channel) {
     return NextResponse.json({ error: "Channel not found" }, { status: 404 });
   }
+  if (channel.isDm && !(await isChannelMember(user.id, channel.id))) {
+    return NextResponse.json({ error: "Channel not found" }, { status: 404 });
+  }
 
   let json: unknown;
   try {
@@ -115,11 +123,13 @@ export async function POST(
   });
 
   const message = serializeMessage(created);
+  const audience = await channelAudience(channel);
   publish({
     type: "message",
     channelId: channel.id,
     message,
     nonce: parsed.data.nonce,
+    ...(audience ? { audience } : {}),
   });
 
   return NextResponse.json({ message });

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth";
 import { publish } from "@/lib/bus";
 import { assertSameOrigin } from "@/lib/security";
+import { channelAudience, isChannelMember } from "@/lib/dm";
 
 export const runtime = "nodejs";
 
@@ -24,14 +25,25 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid message id" }, { status: 400 });
   }
 
-  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { channel: true },
+  });
   if (!message || message.deletedAt) {
     return NextResponse.json({ error: "Message not found" }, { status: 404 });
   }
 
   const isOwner = message.userId === user.id;
-  const isAdmin = user.role === "admin";
-  if (!isOwner && !isAdmin) {
+  if (message.channel.isDm) {
+    // Private DM: must be a member, and only the author may delete (admins
+    // don't moderate private conversations).
+    if (!(await isChannelMember(user.id, message.channelId))) {
+      return NextResponse.json({ error: "Message not found" }, { status: 404 });
+    }
+    if (!isOwner) {
+      return NextResponse.json({ error: "Not allowed" }, { status: 403 });
+    }
+  } else if (!isOwner && user.role !== "admin") {
     return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   }
 
@@ -40,6 +52,12 @@ export async function DELETE(
     data: { deletedAt: new Date() },
   });
 
-  publish({ type: "message-delete", channelId: message.channelId, messageId });
+  const audience = await channelAudience(message.channel);
+  publish({
+    type: "message-delete",
+    channelId: message.channelId,
+    messageId,
+    ...(audience ? { audience } : {}),
+  });
   return NextResponse.json({ ok: true });
 }

@@ -4,6 +4,7 @@ import { requireUser, toSerializedUser } from "@/lib/auth";
 import { publish } from "@/lib/bus";
 import { assertSameOrigin } from "@/lib/security";
 import { allowTyping } from "@/lib/rate-guard";
+import { channelAudience, isChannelMember } from "@/lib/dm";
 
 export const runtime = "nodejs";
 
@@ -28,11 +29,16 @@ export async function POST(
   if (!channel) {
     return NextResponse.json({ error: "Channel not found" }, { status: 404 });
   }
+  if (channel.isDm && !(await isChannelMember(auth.user.id, channel.id))) {
+    return NextResponse.json({ error: "Channel not found" }, { status: 404 });
+  }
 
+  const audience = await channelAudience(channel);
   publish({
     type: "typing",
     channelId: channel.id,
     user: toSerializedUser(auth.user),
+    ...(audience ? { audience } : {}),
   });
   return NextResponse.json({ ok: true });
 }

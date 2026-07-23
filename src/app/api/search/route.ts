@@ -19,7 +19,8 @@ export async function GET(req: Request) {
   }
 
   const rows = await prisma.message.findMany({
-    where: { deletedAt: null, body: { contains: q } },
+    // Search only public channels — never leak private DMs.
+    where: { deletedAt: null, body: { contains: q }, channel: { isDm: false } },
     orderBy: { id: "desc" },
     take: LIMIT,
     include: { user: true, channel: true },
