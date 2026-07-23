@@ -61,6 +61,7 @@ them in real time.
 | `npm run build` / `npm start` | Production build / serve |
 | `npm run lint` | ESLint |
 | `npm test` | Unit tests (Node test runner + tsx) |
+| `npm run test:e2e` | Playwright E2E + API tests (isolated test DB) |
 | `npm run db:push` | Sync the Prisma schema to the database |
 | `npm run db:seed` | Seed default channels (idempotent) |
 | `npm run db:reset` | Wipe + recreate + reseed the database |
@@ -150,12 +151,18 @@ backups, and Playwright E2E in CI.
 ## Tests
 
 ```bash
-npm test
+npm test        # unit tests (pure logic)
+npm run test:e2e   # Playwright end-to-end + API tests
 ```
 
-Unit tests cover the pure logic (slugify, Zod schemas, avatar helpers). The
-real-time flow, auth, and cross-session delivery were verified end-to-end in the
-browser; automating that with Playwright is the next testing milestone.
+- **Unit** (`tests/`) — slugify, Zod schemas, avatar helpers (Node test runner + tsx).
+- **End-to-end** (`e2e/`) — Playwright drives two independent browser contexts
+  (two real users) to prove cross-user real-time delivery, channel broadcast, and
+  persistence across reload. `test:e2e` first provisions an isolated test
+  database (`scripts/setup-e2e-db.mjs`) so it never touches dev data.
+- **API** (`e2e/api.spec.ts`) — request-context tests for the auth gate (401),
+  CSRF/same-origin guard (403), input validation (400), unknown channel (404),
+  duplicate slug (409), per-user rate limit (429), and sign-out-of-all-devices.
 
 ---
 

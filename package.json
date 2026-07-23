@@ -12,6 +12,7 @@
     "db:reset": "prisma db push --force-reset && prisma db seed",
     "db:studio": "prisma studio",
     "test": "node --import tsx --test tests/*.test.ts",
+    "test:e2e": "node scripts/setup-e2e-db.mjs && playwright test",
     "postinstall": "prisma generate"
   },
   "prisma": {
@@ -26,6 +27,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",

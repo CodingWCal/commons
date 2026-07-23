@@ -7,6 +7,11 @@ Audit scope: Full source (`src/app`, `src/components`, `src/lib`, `prisma/`,
 the browser (signup, messaging, realtime across two connections, channel
 creation, presence, validation/negative paths, rate limiting).
 
+> **Progress (2026-07-23):** ✅ Done — TICKET-003, 004, 005, 006, 013.
+> Remaining P0/P1: TICKET-001 (Postgres) and 002 (durable pub/sub) are blocked on
+> provisioning a database/Redis; TICKET-007 (moderation) and 008 (distributed
+> rate limiting) are next.
+
 ## Product Intent Snapshot
 
 - **Plain English:** A calm, focused real-time team chat for the Cursor Boston
@@ -130,6 +135,8 @@ creation, presence, validation/negative paths, rate limiting).
 
 ### TICKET-003: Add CSRF protection to cookie-authenticated mutations
 
+> ✅ **Done** — `assertSameOrigin()` in `src/lib/security.ts` guards every mutating route; verified by Playwright (foreign + missing Origin → 403).
+
 - Priority: P1
 - Type: Security
 - Area: `src/app/api/**/route.ts`, `src/lib/auth.ts`
@@ -160,6 +167,8 @@ creation, presence, validation/negative paths, rate limiting).
   > Implement TICKET-003 using repository context and project instructions. Preserve existing auth UX, stay within acceptance criteria, add a focused test, and report validation results.
 
 ### TICKET-004: Harden the session lifecycle (expiry reaping, invalid-cookie cleanup, sign-out-everywhere)
+
+> ✅ **Done** — `reapExpiredSessions()` + `requireUser()` (clears stale cookies) + `destroyAllSessions()` in `src/lib/auth.ts`; "Sign out of all devices" in the account menu; verified by Playwright.
 
 - Priority: P1
 - Type: Security
@@ -193,6 +202,8 @@ creation, presence, validation/negative paths, rate limiting).
 
 ### TICKET-005: Add Playwright end-to-end tests for the core realtime flow
 
+> ✅ **Done** — `e2e/chat.spec.ts` runs two browser contexts (two real users): cross-user live message, channel broadcast, and persist-across-reload. `npm run test:e2e` (isolated test DB via `scripts/setup-e2e-db.mjs`).
+
 - Priority: P1
 - Type: Test
 - Area: new `e2e/`, CI
@@ -221,6 +232,8 @@ creation, presence, validation/negative paths, rate limiting).
   > Implement TICKET-005 per repository context; keep tests deterministic, wire CI, report results.
 
 ### TICKET-006: Add API integration tests for the route handlers
+
+> ✅ **Done** — implemented as Playwright request-context tests (`e2e/api.spec.ts`) hitting the running server + isolated test DB: auth gate (401), CSRF (403), validation (400), unknown channel (404), duplicate slug (409), rate limit (429), and sign-out-all. (Playwright request context was chosen over direct handler calls because the handlers depend on Next's `cookies()` runtime.)
 
 - Priority: P1
 - Type: Test
@@ -401,6 +414,8 @@ creation, presence, validation/negative paths, rate limiting).
   > Implement TICKET-012 per repository context; use signed uploads, enforce limits, preserve design, add tests, report results.
 
 ### TICKET-013: Deep-linkable channels (per-channel URLs + browser history)
+
+> ✅ **Done** — active channel synced to `?c=slug` via `history.pushState` (SSE stays connected); server reads `?c=` for deep links; back/forward handled via `popstate`. Verified live + implicitly by E2E.
 
 - Priority: P2
 - Type: UX
