@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Avatar from "./Avatar";
+import { useDialogFocus } from "./useDialogFocus";
 
 type Result = {
   id: number;
@@ -22,6 +23,8 @@ export default function SearchDialog({ onJump, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(cardRef);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -68,6 +71,7 @@ export default function SearchDialog({ onJump, onClose }: Props) {
       aria-label="Search messages"
     >
       <div
+        ref={cardRef}
         className="w-full max-w-lg overflow-hidden rounded-xl border border-rule bg-paper-2 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >

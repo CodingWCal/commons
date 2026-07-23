@@ -5,6 +5,7 @@ import { publish } from "@/lib/bus";
 import { assertSameOrigin } from "@/lib/security";
 import { isReactionEmoji } from "@/lib/reactions";
 import { aggregateReactions } from "@/lib/serialize";
+import { allowReaction } from "@/lib/rate-guard";
 
 export const runtime = "nodejs";
 
@@ -35,6 +36,13 @@ export async function POST(
   const emoji = (json as { emoji?: unknown })?.emoji;
   if (!isReactionEmoji(emoji)) {
     return NextResponse.json({ error: "Invalid reaction" }, { status: 400 });
+  }
+
+  if (!allowReaction(user.id)) {
+    return NextResponse.json(
+      { error: "You're reacting too quickly — slow down a moment." },
+      { status: 429 },
+    );
   }
 
   const message = await prisma.message.findUnique({ where: { id: messageId } });

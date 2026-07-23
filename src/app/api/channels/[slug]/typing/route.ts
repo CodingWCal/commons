@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser, toSerializedUser } from "@/lib/auth";
 import { publish } from "@/lib/bus";
 import { assertSameOrigin } from "@/lib/security";
+import { allowTyping } from "@/lib/rate-guard";
 
 export const runtime = "nodejs";
 
@@ -17,6 +18,10 @@ export async function POST(
 
   const auth = await requireUser();
   if ("response" in auth) return auth.response;
+
+  if (!allowTyping(auth.user.id)) {
+    return NextResponse.json({ ok: true }); // silently drop excess typing pings
+  }
 
   const { slug } = await params;
   const channel = await prisma.channel.findUnique({ where: { slug } });

@@ -8,10 +8,13 @@ the browser (signup, messaging, realtime across two connections, channel
 creation, presence, validation/negative paths, rate limiting).
 
 > **Progress (2026-07-23):** ✅ Done — TICKET-003, 004, 005, 006, 007, 010, 011,
-> 013, 015, 019, 020 (11 tickets). All verified live and/or by the Playwright
-> suite. **Still blocked on infra** (need a DB/Redis/object-store/Sentry): 001
-> Postgres, 002 durable pub/sub, 008 distributed rate limit, 012 file uploads,
-> 014 observability. **Remaining unblocked:** 009 DMs, 016 (monitor), 017, 018.
+> 013, 015, 018, 019, 020 (12 tickets). Plus a final-QA hardening pass: added
+> server-side rate limits to the typing + reaction endpoints, rolled back failed
+> optimistic deletes, and made first-user-admin assignment race-safe (transaction).
+> All verified live and/or by the Playwright suite (build + lint + 13 unit + 9 e2e).
+> **Still blocked on infra** (need a DB/Redis/object-store/Sentry): 001 Postgres,
+> 002 durable pub/sub, 008 distributed rate limit, 012 file uploads, 014
+> observability. **Remaining unblocked:** 009 DMs (invasive), 016 (monitor), 017.
 
 ## Product Intent Snapshot
 
@@ -561,6 +564,8 @@ creation, presence, validation/negative paths, rate limiting).
   > Implement TICKET-017 per repository context; verify seed still works, report results.
 
 ### TICKET-018: Accessibility pass — dialog focus trap, `aria-live` verification, reduced-motion
+
+> ✅ **Done** — `useDialogFocus` hook traps Tab within the New Channel + Search dialogs and restores focus to the trigger on close; `aria-live="polite"` on the message list + typing line; reduced-motion respected for message-enter. (Full screen-reader audit still recommended.)
 
 - Priority: P3
 - Type: A11y

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { slugify } from "@/lib/slug";
+import { useDialogFocus } from "./useDialogFocus";
 
 type Props = {
   // Returns an error message on failure, or null on success.
@@ -15,6 +16,8 @@ export default function NewChannelDialog({ onCreate, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const nameRef = useRef<HTMLInputElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(cardRef);
 
   useEffect(() => {
     nameRef.current?.focus();
@@ -52,6 +55,7 @@ export default function NewChannelDialog({ onCreate, onClose }: Props) {
       aria-label="Create a channel"
     >
       <div
+        ref={cardRef}
         className="w-full max-w-md rounded-xl border border-rule bg-paper-2 p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >

@@ -358,6 +358,7 @@ export default function AppShell({
   );
 
   const deleteMessage = useCallback(async (message: ChatMessage) => {
+    // Optimistically remove.
     setMessagesByChannel((prev) => ({
       ...prev,
       [message.channelId]: (prev[message.channelId] ?? []).filter(
@@ -368,6 +369,19 @@ export default function AppShell({
       const res = await fetch(`/api/messages/${message.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("delete failed");
     } catch {
+      // Roll back: reinsert the message in id order (confirmed asc, pending last).
+      setMessagesByChannel((prev) => {
+        const list = prev[message.channelId] ?? [];
+        if (list.some((m) => m.id === message.id)) return prev;
+        const restored = [...list, message].sort((a, b) => {
+          const ap = a.id < 0;
+          const bp = b.id < 0;
+          if (ap && !bp) return 1;
+          if (!ap && bp) return -1;
+          return a.id - b.id;
+        });
+        return { ...prev, [message.channelId]: restored };
+      });
       setSendError("Couldn't delete that message. Please try again.");
     }
   }, []);

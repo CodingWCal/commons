@@ -50,16 +50,20 @@ export async function POST(req: Request) {
   }
 
   // The first person to join becomes the workspace admin (facilitator).
-  const isFirstUser = (await prisma.user.count()) === 0;
-
-  const user = await prisma.user.create({
-    data: {
-      displayName,
-      email,
-      passwordHash: await hashPassword(password),
-      avatarColor: pickAvatarColor(email),
-      role: isFirstUser ? "admin" : "member",
-    },
+  // Wrap count+create in a transaction so two racing first-signups can't both
+  // be granted admin.
+  const passwordHash = await hashPassword(password);
+  const user = await prisma.$transaction(async (tx) => {
+    const isFirstUser = (await tx.user.count()) === 0;
+    return tx.user.create({
+      data: {
+        displayName,
+        email,
+        passwordHash,
+        avatarColor: pickAvatarColor(email),
+        role: isFirstUser ? "admin" : "member",
+      },
+    });
   });
 
   await createSession(user.id);
