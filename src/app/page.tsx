@@ -2,8 +2,11 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { onlineUsers } from "@/lib/presence";
+import { serializeMessage } from "@/lib/serialize";
 import AppShell from "@/components/AppShell";
 import type { SerializedChannel, SerializedMessage } from "@/lib/types";
+
+const PAGE_SIZE = 50;
 
 export const dynamic = "force-dynamic";
 
@@ -37,24 +40,16 @@ export default async function HomePage({
     (c ? channels.find((ch) => ch.slug === c) : undefined) ?? channels[0] ?? null;
 
   let initialMessages: SerializedMessage[] = [];
+  let initialHasMore = false;
   if (active) {
     const rows = await prisma.message.findMany({
-      where: { channelId: active.id },
+      where: { channelId: active.id, deletedAt: null },
       orderBy: { id: "desc" },
-      take: 50,
-      include: { user: true },
+      take: PAGE_SIZE + 1,
+      include: { user: true, reactions: true },
     });
-    initialMessages = rows.reverse().map((m) => ({
-      id: m.id,
-      body: m.body,
-      channelId: m.channelId,
-      createdAt: m.createdAt.toISOString(),
-      user: {
-        id: m.user.id,
-        displayName: m.user.displayName,
-        avatarColor: m.user.avatarColor,
-      },
-    }));
+    initialHasMore = rows.length > PAGE_SIZE;
+    initialMessages = rows.slice(0, PAGE_SIZE).reverse().map(serializeMessage);
   }
 
   return (
@@ -64,10 +59,12 @@ export default async function HomePage({
         displayName: user.displayName,
         email: user.email,
         avatarColor: user.avatarColor,
+        role: user.role === "admin" ? "admin" : "member",
       }}
       channels={channels}
       initialActiveChannelId={active?.id ?? null}
       initialMessages={initialMessages}
+      initialHasMore={initialHasMore}
       initialOnline={onlineUsers()}
     />
   );

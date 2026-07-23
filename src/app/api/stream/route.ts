@@ -2,6 +2,7 @@ import { getCurrentUser, toSerializedUser } from "@/lib/auth";
 import { subscribe } from "@/lib/bus";
 import { addConnection, removeConnection } from "@/lib/presence";
 import { prisma } from "@/lib/prisma";
+import { serializeMessage } from "@/lib/serialize";
 import type { BusEvent, SerializedMessage } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -62,6 +63,19 @@ export async function GET(req: Request) {
       unsubscribe = subscribe((event: BusEvent) => {
         if (event.type === "message") {
           sendMessage(event.channelId, event.message, event.nonce);
+        } else if (event.type === "message-delete") {
+          sendEvent("message-delete", {
+            channelId: event.channelId,
+            messageId: event.messageId,
+          });
+        } else if (event.type === "reaction") {
+          sendEvent("reaction", {
+            channelId: event.channelId,
+            messageId: event.messageId,
+            reactions: event.reactions,
+          });
+        } else if (event.type === "typing") {
+          sendEvent("typing", { channelId: event.channelId, user: event.user });
         } else if (event.type === "channel") {
           sendEvent("channel", event.channel);
         } else if (event.type === "presence") {
@@ -69,22 +83,16 @@ export async function GET(req: Request) {
         }
       });
 
-      // Backfill messages missed while disconnected.
+      // Backfill messages missed while disconnected (skip deleted).
       if (lastEventId > 0) {
         const missed = await prisma.message.findMany({
-          where: { id: { gt: lastEventId } },
+          where: { id: { gt: lastEventId }, deletedAt: null },
           orderBy: { id: "asc" },
           take: BACKFILL_LIMIT,
-          include: { user: true },
+          include: { user: true, reactions: true },
         });
         for (const m of missed) {
-          sendMessage(m.channelId, {
-            id: m.id,
-            body: m.body,
-            channelId: m.channelId,
-            createdAt: m.createdAt.toISOString(),
-            user: toSerializedUser(m.user),
-          });
+          sendMessage(m.channelId, serializeMessage(m));
         }
       }
 

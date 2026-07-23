@@ -6,6 +6,29 @@ import { test, expect } from "@playwright/test";
 const BASE = "http://localhost:4020";
 const RUN = Date.now();
 
+type Ctx = Awaited<ReturnType<typeof newSignedInCtx>>;
+
+async function newSignedInCtx(
+  playwright: import("@playwright/test").PlaywrightWorkerArgs["playwright"],
+  email: string,
+) {
+  const ctx = await playwright.request.newContext({ baseURL: BASE });
+  await ctx.post("/api/auth/signup", {
+    headers: { origin: BASE },
+    data: { displayName: email, email, password: "supersecret" },
+  });
+  return ctx;
+}
+
+async function postMessage(ctx: Ctx, body: string): Promise<number> {
+  const res = await ctx.post("/api/channels/general/messages", {
+    headers: { origin: BASE },
+    data: { body },
+  });
+  const data = (await res.json()) as { message: { id: number } };
+  return data.message.id;
+}
+
 test("auth gate, validation, and CSRF are enforced", async ({ request }) => {
   // Unauthenticated read is rejected.
   expect((await request.get("/api/channels")).status()).toBe(401);
@@ -122,4 +145,64 @@ test("sign out of all devices invalidates the session", async ({ request }) => {
 
   // Session is gone afterward.
   expect((await request.get("/api/channels")).status()).toBe(401);
+});
+
+test("reactions toggle on and off, and reject unknown emoji", async ({ playwright }) => {
+  const ctx = await newSignedInCtx(playwright, `react+${RUN}@example.com`);
+  const id = await postMessage(ctx, `reaction target ${RUN}`);
+
+  const on = await ctx.post(`/api/messages/${id}/reactions`, {
+    headers: { origin: BASE },
+    data: { emoji: "👍" },
+  });
+  const onData = (await on.json()) as {
+    reactions: { emoji: string; count: number }[];
+  };
+  expect(onData.reactions.find((r) => r.emoji === "👍")?.count).toBe(1);
+
+  const off = await ctx.post(`/api/messages/${id}/reactions`, {
+    headers: { origin: BASE },
+    data: { emoji: "👍" },
+  });
+  expect(((await off.json()) as { reactions: unknown[] }).reactions.length).toBe(0);
+
+  const bad = await ctx.post(`/api/messages/${id}/reactions`, {
+    headers: { origin: BASE },
+    data: { emoji: "🚀" },
+  });
+  expect(bad.status()).toBe(400);
+
+  await ctx.dispose();
+});
+
+test("only the author (or an admin) can delete a message", async ({ playwright }) => {
+  const author = await newSignedInCtx(playwright, `author+${RUN}@example.com`);
+  const other = await newSignedInCtx(playwright, `other+${RUN}@example.com`);
+  const id = await postMessage(author, `delete target ${RUN}`);
+
+  // A different, non-admin user cannot delete it.
+  expect(
+    (await other.delete(`/api/messages/${id}`, { headers: { origin: BASE } })).status(),
+  ).toBe(403);
+
+  // The author can.
+  expect(
+    (await author.delete(`/api/messages/${id}`, { headers: { origin: BASE } })).status(),
+  ).toBe(200);
+
+  await author.dispose();
+  await other.dispose();
+});
+
+test("search finds a message by its content", async ({ playwright }) => {
+  const ctx = await newSignedInCtx(playwright, `search+${RUN}@example.com`);
+  const term = `xyzzy${RUN}`;
+  await postMessage(ctx, `a distinctive ${term} token`);
+
+  const res = await ctx.get(`/api/search?q=${term}`);
+  const data = (await res.json()) as { results: { body: string }[] };
+  expect(data.results.length).toBeGreaterThan(0);
+  expect(data.results[0].body).toContain(term);
+
+  await ctx.dispose();
 });

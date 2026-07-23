@@ -26,6 +26,19 @@ export async function POST(req: Request) {
     );
   }
 
+  // Optional invite gate (TICKET-020): when COMMONS_INVITE_CODE is set, signup
+  // requires a matching code. Unset = open signup.
+  const requiredCode = process.env.COMMONS_INVITE_CODE;
+  if (requiredCode) {
+    const provided = (json as { inviteCode?: unknown })?.inviteCode;
+    if (provided !== requiredCode) {
+      return NextResponse.json(
+        { error: "A valid invite code is required to join." },
+        { status: 403 },
+      );
+    }
+  }
+
   const { displayName, email, password } = parsed.data;
 
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -36,12 +49,16 @@ export async function POST(req: Request) {
     );
   }
 
+  // The first person to join becomes the workspace admin (facilitator).
+  const isFirstUser = (await prisma.user.count()) === 0;
+
   const user = await prisma.user.create({
     data: {
       displayName,
       email,
       passwordHash: await hashPassword(password),
       avatarColor: pickAvatarColor(email),
+      role: isFirstUser ? "admin" : "member",
     },
   });
 

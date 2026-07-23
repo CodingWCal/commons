@@ -7,10 +7,11 @@ Audit scope: Full source (`src/app`, `src/components`, `src/lib`, `prisma/`,
 the browser (signup, messaging, realtime across two connections, channel
 creation, presence, validation/negative paths, rate limiting).
 
-> **Progress (2026-07-23):** ✅ Done — TICKET-003, 004, 005, 006, 013.
-> Remaining P0/P1: TICKET-001 (Postgres) and 002 (durable pub/sub) are blocked on
-> provisioning a database/Redis; TICKET-007 (moderation) and 008 (distributed
-> rate limiting) are next.
+> **Progress (2026-07-23):** ✅ Done — TICKET-003, 004, 005, 006, 007, 010, 011,
+> 013, 015, 019, 020 (11 tickets). All verified live and/or by the Playwright
+> suite. **Still blocked on infra** (need a DB/Redis/object-store/Sentry): 001
+> Postgres, 002 durable pub/sub, 008 distributed rate limit, 012 file uploads,
+> 014 observability. **Remaining unblocked:** 009 DMs, 016 (monitor), 017, 018.
 
 ## Product Intent Snapshot
 
@@ -262,6 +263,8 @@ creation, presence, validation/negative paths, rate limiting).
 
 ### TICKET-007: Moderation & roles — delete/edit own messages, admin controls
 
+> ✅ **Done** (delete + roles) — `User.role` (first signup becomes admin), soft-delete via `DELETE /api/messages/:id` (author or admin), live removal through the `message-delete` SSE event, delete affordance in `MessageItem`. Verified live + Playwright permission test. (Message *editing* deferred.)
+
 - Priority: P1
 - Type: Feature
 - Area: `prisma/schema.prisma`, message API, `MessageList.tsx`, sidebar
@@ -342,6 +345,8 @@ creation, presence, validation/negative paths, rate limiting).
 
 ### TICKET-010: Message reactions (emoji)
 
+> ✅ **Done** — `Reaction` model (unique per message+user+emoji), toggle via `POST /api/messages/:id/reactions`, live `reaction` SSE event, reaction pills + hover emoji picker in `MessageItem`. Verified live + Playwright toggle/invalid-emoji test.
+
 - Priority: P2
 - Type: Feature
 - Area: schema, message API/SSE, `MessageList.tsx`
@@ -365,6 +370,8 @@ creation, presence, validation/negative paths, rate limiting).
   > Implement TICKET-010 per repository context; extend the SSE event union, preserve design, add tests, report results.
 
 ### TICKET-011: Search over message history
+
+> ✅ **Done** — `GET /api/search?q=` (case-insensitive `contains`, excludes deleted), debounced `SearchDialog` with results (author + channel + snippet) that jumps to the channel on click. Verified live + Playwright test. (Postgres full-text + jump-to-message deferred.)
 
 - Priority: P2
 - Type: Feature
@@ -471,6 +478,8 @@ creation, presence, validation/negative paths, rate limiting).
   > Implement TICKET-014 per repository context; keep secrets in env, report results.
 
 ### TICKET-015: Paginated history / infinite scroll (load older messages)
+
+> ✅ **Done** — `?before=<id>` cursor on the messages GET (returns `hasMore`); `MessageList` loads older on scroll-to-top and preserves scroll position; "beginning of #channel" boundary shown. Verified live (boundary + cursor).
 
 - Priority: P2
 - Type: Feature
@@ -580,6 +589,8 @@ creation, presence, validation/negative paths, rate limiting).
 
 ### TICKET-019: Typing indicators
 
+> ✅ **Done** — ephemeral `typing` SSE event via `POST /api/channels/:slug/typing` (client-throttled to ~2s), "X is typing…" with auto-expire in `AppShell`. Verified live (endpoint 200 + indicator).
+
 - Priority: P3
 - Type: Feature
 - Area: SSE, composer, channel header
@@ -602,6 +613,8 @@ creation, presence, validation/negative paths, rate limiting).
   > Implement TICKET-019 per repository context; keep events ephemeral + throttled, report results.
 
 ### TICKET-020: Gate signup with an invite code or email allowlist
+
+> ✅ **Done** (invite code) — `COMMONS_INVITE_CODE` env gates signup when set (open otherwise); optional invite field in `AuthForm`; documented in `.env.example`. Email-allowlist variant deferred.
 
 - Priority: P3
 - Type: Security

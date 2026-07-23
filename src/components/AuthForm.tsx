@@ -14,6 +14,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -26,7 +27,14 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
-          isSignup ? { displayName, email, password } : { email, password },
+          isSignup
+            ? {
+                displayName,
+                email,
+                password,
+                ...(inviteCode.trim() ? { inviteCode: inviteCode.trim() } : {}),
+              }
+            : { email, password },
         ),
       });
       if (!res.ok) {
@@ -114,6 +122,15 @@ export default function AuthForm({ mode }: { mode: Mode }) {
               placeholder={isSignup ? "At least 8 characters" : "Your password"}
               required
             />
+            {isSignup && (
+              <Field
+                label="Invite code"
+                id="inviteCode"
+                value={inviteCode}
+                onChange={setInviteCode}
+                placeholder="If your workspace requires one"
+              />
+            )}
 
             {error && (
               <p

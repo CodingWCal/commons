@@ -9,6 +9,7 @@ export type CurrentUser = {
   displayName: string;
   email: string;
   avatarColor: string;
+  role: "member" | "admin";
 };
 
 // A message in the client store. Confirmed messages have a real numeric id;

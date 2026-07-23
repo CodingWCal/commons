@@ -7,12 +7,19 @@ export type SerializedUser = {
   avatarColor: string;
 };
 
+export type ReactionSummary = {
+  emoji: string;
+  count: number;
+  userIds: string[]; // clients derive "did I react?" from this
+};
+
 export type SerializedMessage = {
   id: number;
   body: string;
   channelId: string;
   createdAt: string;
   user: SerializedUser;
+  reactions: ReactionSummary[];
 };
 
 export type SerializedChannel = {
@@ -25,5 +32,13 @@ export type SerializedChannel = {
 // Events pushed from the server to clients over the SSE stream.
 export type BusEvent =
   | { type: "message"; channelId: string; message: SerializedMessage; nonce?: string }
+  | { type: "message-delete"; channelId: string; messageId: number }
+  | {
+      type: "reaction";
+      channelId: string;
+      messageId: number;
+      reactions: ReactionSummary[];
+    }
+  | { type: "typing"; channelId: string; user: SerializedUser }
   | { type: "channel"; channel: SerializedChannel }
   | { type: "presence"; online: SerializedUser[] };

@@ -13,15 +13,17 @@ datasource db {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id           String     @id @default(cuid())
+  email        String     @unique
   displayName  String
   passwordHash String
-  avatarColor  String    @default("#3F7D5B")
-  createdAt    DateTime  @default(now())
+  avatarColor  String     @default("#3F7D5B")
+  role         String     @default("member") // "member" | "admin"
+  createdAt    DateTime   @default(now())
   sessions     Session[]
   messages     Message[]
-  channels     Channel[] @relation("ChannelCreatedBy")
+  channels     Channel[]  @relation("ChannelCreatedBy")
+  reactions    Reaction[]
 }
 
 model Session {
@@ -47,13 +49,28 @@ model Channel {
 }
 
 model Message {
-  id        Int      @id @default(autoincrement())
+  id        Int        @id @default(autoincrement())
   body      String
   channelId String
-  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  channel   Channel    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
+  deletedAt DateTime? // soft delete (TICKET-007)
+  reactions Reaction[]
+
+  @@index([channelId, id])
+}
+
+model Reaction {
+  id        String   @id @default(cuid())
+  emoji     String
+  messageId Int
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
-  @@index([channelId, id])
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
 }

@@ -10,12 +10,11 @@ type Props = {
   channels: SerializedChannel[];
   activeChannelId: string | null;
   online: SerializedUser[];
-  onlineIds: Set<string>;
   unread: Record<string, number>;
-  status: "connecting" | "live" | "reconnecting";
   open: boolean;
   onSelectChannel: (channel: SerializedChannel) => void;
   onNewChannel: () => void;
+  onOpenSearch: () => void;
   onClose: () => void;
   onLogout: (scope: "current" | "all") => void;
 };
@@ -29,6 +28,7 @@ export default function Sidebar({
   open,
   onSelectChannel,
   onNewChannel,
+  onOpenSearch,
   onClose,
   onLogout,
 }: Props) {
@@ -68,6 +68,18 @@ export default function Sidebar({
             aria-label="Close channel list"
           >
             <CloseIcon />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-2 pt-3">
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            className="flex w-full items-center gap-2 rounded-md border border-rule bg-paper px-2.5 py-1.5 text-sm text-ink-3 hover:border-rule-2 hover:text-ink-2"
+          >
+            <SearchIcon />
+            <span>Search messages…</span>
           </button>
         </div>
 
@@ -209,6 +221,15 @@ export default function Sidebar({
         </div>
       </aside>
     </>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+      <path d="M21 21l-4.3-4.3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
   );
 }
 

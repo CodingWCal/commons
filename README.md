@@ -20,9 +20,16 @@ database. No accounts, no API keys, no external services required to run it.
   seeded by default.
 - ⚡ **Real-time messaging** — messages appear for everyone in the channel in
   under a second via Server-Sent Events. Optimistic send with retry-on-failure.
-- 🟢 **Presence** — see who's online, updated live (ref-counted, so multiple
-  tabs count once).
-- 🕓 **Persistent history** — messages are stored and reload with the page.
+- 🟢 **Presence & typing** — see who's online (ref-counted across tabs) and
+  "X is typing…" indicators, all live.
+- 😀 **Reactions** — toggle emoji reactions; counts update live for everyone.
+- 🛡️ **Moderation & roles** — the first member becomes admin; authors delete
+  their own messages, admins delete any (soft delete, removed live).
+- 🔎 **Search** — find past messages by content, jump to the channel.
+- 🎟️ **Invite gating (optional)** — set `COMMONS_INVITE_CODE` to require a code
+  at signup.
+- 🕓 **Persistent, paginated history** — messages persist and older ones load as
+  you scroll up.
 - 🔁 **Reconnect + backfill** — if the stream drops, the client reconnects and
   replays anything it missed (via `Last-Event-ID`).
 - 🚦 **Abuse guards** — server-side Zod validation, message length caps, and a

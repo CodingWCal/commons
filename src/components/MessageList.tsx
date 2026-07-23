@@ -1,21 +1,24 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
-import Avatar from "./Avatar";
+import MessageItem from "./MessageItem";
 import type { ChatMessage } from "./chat-types";
 
 type Props = {
   messages: ChatMessage[];
   currentUserId: string;
+  isAdmin: boolean;
   channelName: string;
+  hasMore: boolean;
+  loadingOlder: boolean;
+  onLoadOlder: () => void;
+  onReact: (message: ChatMessage, emoji: string) => void;
+  onDelete: (message: ChatMessage) => void;
   onRetry: (message: ChatMessage) => void;
 };
 
 const GROUP_GAP_MS = 5 * 60 * 1000;
-
-function timeLabel(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
+const LOAD_OLDER_THRESHOLD_PX = 80;
 
 function dayLabel(iso: string): string {
   const d = new Date(iso);
@@ -31,34 +34,72 @@ function dayLabel(iso: string): string {
 export default function MessageList({
   messages,
   currentUserId,
+  isAdmin,
   channelName,
+  hasMore,
+  loadingOlder,
+  onLoadOlder,
+  onReact,
+  onDelete,
   onRetry,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const wantBottom = useRef(true);
+  const prevFirstId = useRef<number | null>(null);
+  // When loading older messages, remember the scroll metrics so we can keep the
+  // viewport anchored after the prepend.
+  const pendingOlder = useRef<{ height: number; top: number } | null>(null);
 
   useLayoutEffect(() => {
     wantBottom.current = true;
+    prevFirstId.current = null;
   }, [channelName]);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
-    if (wantBottom.current) {
-      el.scrollTop = el.scrollHeight;
-      if (messages.length > 0) wantBottom.current = false;
-    } else if (nearBottom) {
-      el.scrollTop = el.scrollHeight;
+
+    const firstId = messages.find((m) => m.id > 0)?.id ?? null;
+    const prepended =
+      pendingOlder.current !== null &&
+      firstId !== null &&
+      prevFirstId.current !== null &&
+      firstId < prevFirstId.current;
+
+    if (prepended && pendingOlder.current) {
+      // Restore position so the content the user was reading stays put.
+      el.scrollTop = el.scrollHeight - pendingOlder.current.height + pendingOlder.current.top;
+      pendingOlder.current = null;
+    } else {
+      pendingOlder.current = null;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
+      if (wantBottom.current) {
+        el.scrollTop = el.scrollHeight;
+        if (messages.length > 0) wantBottom.current = false;
+      } else if (nearBottom) {
+        el.scrollTop = el.scrollHeight;
+      }
     }
+    prevFirstId.current = firstId;
   }, [messages, channelName]);
+
+  function handleScroll() {
+    const el = containerRef.current;
+    if (!el) return;
+    if (
+      el.scrollTop < LOAD_OLDER_THRESHOLD_PX &&
+      hasMore &&
+      !loadingOlder &&
+      !pendingOlder.current
+    ) {
+      pendingOlder.current = { height: el.scrollHeight, top: el.scrollTop };
+      onLoadOlder();
+    }
+  }
 
   if (messages.length === 0) {
     return (
-      <div
-        ref={containerRef}
-        className="scroll-thin flex flex-1 items-center justify-center overflow-y-auto p-6"
-      >
+      <div className="scroll-thin flex flex-1 items-center justify-center overflow-y-auto p-6">
         <div className="text-center">
           <p className="text-lg font-medium text-ink">
             {channelName ? `Welcome to #${channelName}` : "No channel selected"}
@@ -76,97 +117,60 @@ export default function MessageList({
   return (
     <div
       ref={containerRef}
+      onScroll={handleScroll}
       className="scroll-thin flex-1 overflow-y-auto px-4 py-4"
       aria-live="polite"
       aria-label={`Messages in ${channelName}`}
     >
-      <div className="mx-auto max-w-3xl space-y-0.5">
-        {messages.map((message, i) => {
-          const prev = messages[i - 1];
-          const showDay =
-            !prev ||
-            new Date(prev.createdAt).toDateString() !==
-              new Date(message.createdAt).toDateString();
-          const grouped =
-            !showDay &&
-            prev &&
-            prev.user.id === message.user.id &&
-            new Date(message.createdAt).getTime() -
-              new Date(prev.createdAt).getTime() <
-              GROUP_GAP_MS;
+      <div className="mx-auto max-w-3xl">
+        {loadingOlder && (
+          <p className="py-2 text-center text-xs text-ink-3">Loading older messages…</p>
+        )}
+        {!hasMore && (
+          <p className="py-2 text-center text-xs text-ink-3">
+            This is the beginning of #{channelName}.
+          </p>
+        )}
 
-          return (
-            <div key={message.nonce ?? message.id}>
-              {showDay && (
-                <div className="my-4 flex items-center gap-3">
-                  <div className="h-px flex-1 bg-rule" />
-                  <span className="text-xs font-medium text-ink-3">
-                    {dayLabel(message.createdAt)}
-                  </span>
-                  <div className="h-px flex-1 bg-rule" />
-                </div>
-              )}
+        <div className="space-y-0.5">
+          {messages.map((message, i) => {
+            const prev = messages[i - 1];
+            const showDay =
+              !prev ||
+              new Date(prev.createdAt).toDateString() !==
+                new Date(message.createdAt).toDateString();
+            const grouped =
+              !showDay &&
+              !!prev &&
+              prev.user.id === message.user.id &&
+              new Date(message.createdAt).getTime() -
+                new Date(prev.createdAt).getTime() <
+                GROUP_GAP_MS;
 
-              <div
-                className={`group flex gap-3 rounded-md px-2 ${
-                  grouped ? "py-0.5" : "mt-2 py-0.5"
-                } hover:bg-paper-2`}
-              >
-                <div className="w-9 shrink-0">
-                  {!grouped ? (
-                    <Avatar
-                      name={message.user.displayName}
-                      color={message.user.avatarColor}
-                      size={36}
-                    />
-                  ) : (
-                    <span className="mt-1 block text-right text-[10px] leading-5 text-transparent group-hover:text-ink-3">
-                      {timeLabel(message.createdAt)}
+            return (
+              <div key={message.nonce ?? message.id}>
+                {showDay && (
+                  <div className="my-4 flex items-center gap-3">
+                    <div className="h-px flex-1 bg-rule" />
+                    <span className="text-xs font-medium text-ink-3">
+                      {dayLabel(message.createdAt)}
                     </span>
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  {!grouped && (
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-sm font-semibold text-ink">
-                        {message.user.displayName}
-                        {message.user.id === currentUserId && (
-                          <span className="ml-1 font-normal text-ink-3">(you)</span>
-                        )}
-                      </span>
-                      <span className="text-xs text-ink-3">
-                        {timeLabel(message.createdAt)}
-                      </span>
-                    </div>
-                  )}
-                  <p
-                    className={`message-body animate-message-in text-sm leading-relaxed ${
-                      message.failed ? "text-danger" : "text-ink"
-                    } ${message.pending ? "opacity-60" : ""}`}
-                  >
-                    {message.body}
-                  </p>
-                  {message.pending && (
-                    <span className="text-xs text-ink-3">Sending…</span>
-                  )}
-                  {message.failed && (
-                    <span className="text-xs text-danger">
-                      Failed to send.{" "}
-                      <button
-                        type="button"
-                        onClick={() => onRetry(message)}
-                        className="font-medium underline hover:no-underline"
-                      >
-                        Retry
-                      </button>
-                    </span>
-                  )}
-                </div>
+                    <div className="h-px flex-1 bg-rule" />
+                  </div>
+                )}
+                <MessageItem
+                  message={message}
+                  currentUserId={currentUserId}
+                  isAdmin={isAdmin}
+                  grouped={grouped}
+                  onReact={(emoji) => onReact(message, emoji)}
+                  onDelete={() => onDelete(message)}
+                  onRetry={() => onRetry(message)}
+                />
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );

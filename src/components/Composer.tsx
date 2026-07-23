@@ -8,6 +8,7 @@ type Props = {
   error: string | null;
   onClearError: () => void;
   onSend: (body: string) => void;
+  onTyping: () => void;
 };
 
 const MAX = 4000;
@@ -19,6 +20,7 @@ export default function Composer({
   error,
   onClearError,
   onSend,
+  onTyping,
 }: Props) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -76,6 +78,7 @@ export default function Composer({
             onChange={(e) => {
               setValue(e.target.value);
               if (error) onClearError();
+              if (e.target.value.trim()) onTyping();
             }}
             onKeyDown={handleKeyDown}
             placeholder={

@@ -6,6 +6,7 @@ import Sidebar from "./Sidebar";
 import MessageList from "./MessageList";
 import Composer from "./Composer";
 import NewChannelDialog from "./NewChannelDialog";
+import SearchDialog from "./SearchDialog";
 import type {
   ChatMessage,
   CurrentUser,
@@ -13,20 +14,21 @@ import type {
   SerializedMessage,
   SerializedUser,
 } from "./chat-types";
+import type { ReactionSummary } from "@/lib/types";
 
 type ConnectionStatus = "connecting" | "live" | "reconnecting";
 type MessageMap = Record<string, ChatMessage[]>;
+type TypingMap = Record<string, Record<string, { user: SerializedUser; at: number }>>;
 
 type Props = {
   currentUser: CurrentUser;
   channels: SerializedChannel[];
   initialActiveChannelId: string | null;
   initialMessages: SerializedMessage[];
+  initialHasMore: boolean;
   initialOnline: SerializedUser[];
 };
 
-// Merge an incoming message into a channel's list: reconcile an optimistic
-// message by nonce, or de-dupe by id, otherwise append.
 function mergeIncoming(
   map: MessageMap,
   channelId: string,
@@ -34,7 +36,6 @@ function mergeIncoming(
   nonce?: string,
 ): MessageMap {
   const list = map[channelId] ?? [];
-
   if (nonce) {
     const idx = list.findIndex((m) => m.nonce === nonce);
     if (idx !== -1) {
@@ -47,45 +48,36 @@ function mergeIncoming(
   return { ...map, [channelId]: [...list, message] };
 }
 
-// Combine freshly fetched history with whatever is already in the store
-// (confirmed messages de-duped + ordered by id; optimistic temps kept last).
-function mergeHistory(
-  existing: ChatMessage[],
-  fetched: SerializedMessage[],
-): ChatMessage[] {
-  const confirmed = new Map<number, ChatMessage>();
-  for (const m of [...existing, ...fetched]) {
-    if (m.id > 0) confirmed.set(m.id, m as ChatMessage);
-  }
-  const ordered = [...confirmed.values()].sort((a, b) => a.id - b.id);
-  const pending = existing.filter((m) => m.id < 0);
-  return [...ordered, ...pending];
-}
-
 export default function AppShell({
   currentUser,
   channels: initialChannels,
   initialActiveChannelId,
   initialMessages,
+  initialHasMore,
   initialOnline,
 }: Props) {
   const router = useRouter();
+  const isAdmin = currentUser.role === "admin";
 
   const [channels, setChannels] = useState<SerializedChannel[]>(initialChannels);
   const [activeChannelId, setActiveChannelId] = useState<string | null>(
     initialActiveChannelId,
   );
   const [messagesByChannel, setMessagesByChannel] = useState<MessageMap>(() =>
-    initialActiveChannelId
-      ? { [initialActiveChannelId]: initialMessages }
-      : {},
+    initialActiveChannelId ? { [initialActiveChannelId]: initialMessages } : {},
   );
+  const [hasMoreByChannel, setHasMoreByChannel] = useState<Record<string, boolean>>(
+    () => (initialActiveChannelId ? { [initialActiveChannelId]: initialHasMore } : {}),
+  );
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [online, setOnline] = useState<SerializedUser[]>(initialOnline);
   const [status, setStatus] = useState<ConnectionStatus>("connecting");
   const [unread, setUnread] = useState<Record<string, number>>({});
+  const [typing, setTyping] = useState<TypingMap>({});
   const [sendError, setSendError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const loadedChannels = useRef<Set<string>>(
     new Set(initialActiveChannelId ? [initialActiveChannelId] : []),
@@ -93,11 +85,11 @@ export default function AppShell({
   const tempIdRef = useRef(0);
   const activeIdRef = useRef<string | null>(initialActiveChannelId);
   const channelsRef = useRef<SerializedChannel[]>(initialChannels);
+  const typingThrottle = useRef(0);
 
   useEffect(() => {
     activeIdRef.current = activeChannelId;
   }, [activeChannelId]);
-
   useEffect(() => {
     channelsRef.current = channels;
   }, [channels]);
@@ -110,7 +102,6 @@ export default function AppShell({
   // ---- Real-time stream (opened once) ------------------------------------
   useEffect(() => {
     const es = new EventSource("/api/stream");
-
     es.onopen = () => setStatus("live");
     es.onerror = () => setStatus("reconnecting");
 
@@ -119,11 +110,47 @@ export default function AppShell({
         (e as MessageEvent).data,
       ) as { channelId: string; message: SerializedMessage; nonce?: string };
       setMessagesByChannel((prev) => mergeIncoming(prev, channelId, message, nonce));
-
-      const fromSomeoneElse = message.user.id !== currentUser.id;
-      if (fromSomeoneElse && channelId !== activeIdRef.current) {
+      if (message.user.id !== currentUser.id && channelId !== activeIdRef.current) {
         setUnread((prev) => ({ ...prev, [channelId]: (prev[channelId] ?? 0) + 1 }));
       }
+    });
+
+    es.addEventListener("message-delete", (e) => {
+      const { channelId, messageId } = JSON.parse((e as MessageEvent).data) as {
+        channelId: string;
+        messageId: number;
+      };
+      setMessagesByChannel((prev) => ({
+        ...prev,
+        [channelId]: (prev[channelId] ?? []).filter((m) => m.id !== messageId),
+      }));
+    });
+
+    es.addEventListener("reaction", (e) => {
+      const { channelId, messageId, reactions } = JSON.parse(
+        (e as MessageEvent).data,
+      ) as { channelId: string; messageId: number; reactions: ReactionSummary[] };
+      setMessagesByChannel((prev) => ({
+        ...prev,
+        [channelId]: (prev[channelId] ?? []).map((m) =>
+          m.id === messageId ? { ...m, reactions } : m,
+        ),
+      }));
+    });
+
+    es.addEventListener("typing", (e) => {
+      const { channelId, user } = JSON.parse((e as MessageEvent).data) as {
+        channelId: string;
+        user: SerializedUser;
+      };
+      if (user.id === currentUser.id) return;
+      setTyping((prev) => ({
+        ...prev,
+        [channelId]: {
+          ...(prev[channelId] ?? {}),
+          [user.id]: { user, at: Date.now() },
+        },
+      }));
     });
 
     es.addEventListener("channel", (e) => {
@@ -150,6 +177,27 @@ export default function AppShell({
     return () => es.close();
   }, [currentUser.id]);
 
+  // Expire stale typing indicators.
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTyping((prev) => {
+        const now = Date.now();
+        const next: TypingMap = {};
+        let changed = false;
+        for (const cid of Object.keys(prev)) {
+          const users: Record<string, { user: SerializedUser; at: number }> = {};
+          for (const uid of Object.keys(prev[cid])) {
+            if (now - prev[cid][uid].at < 4000) users[uid] = prev[cid][uid];
+            else changed = true;
+          }
+          if (Object.keys(users).length) next[cid] = users;
+        }
+        return changed ? next : prev;
+      });
+    }, 1500);
+    return () => clearInterval(timer);
+  }, []);
+
   // ---- Channel switching --------------------------------------------------
   const selectChannel = useCallback(
     async (channel: SerializedChannel, pushUrl = true) => {
@@ -170,19 +218,20 @@ export default function AppShell({
       try {
         const res = await fetch(`/api/channels/${channel.slug}/messages`);
         if (!res.ok) throw new Error("history fetch failed");
-        const { messages } = (await res.json()) as { messages: SerializedMessage[] };
-        setMessagesByChannel((prev) => ({
-          ...prev,
-          [channel.id]: mergeHistory(prev[channel.id] ?? [], messages),
-        }));
+        const { messages, hasMore } = (await res.json()) as {
+          messages: SerializedMessage[];
+          hasMore: boolean;
+        };
+        setMessagesByChannel((prev) => ({ ...prev, [channel.id]: messages }));
+        setHasMoreByChannel((prev) => ({ ...prev, [channel.id]: hasMore }));
       } catch {
-        loadedChannels.current.delete(channel.id); // allow a retry on next open
+        loadedChannels.current.delete(channel.id);
       }
     },
     [],
   );
 
-  // Sync active channel with the URL (?c=slug) for deep-linking + back/forward.
+  // URL <-> active channel sync (deep-link + back/forward).
   useEffect(() => {
     if (typeof window === "undefined") return;
     const current = new URLSearchParams(window.location.search).get("c");
@@ -194,7 +243,6 @@ export default function AppShell({
         `${window.location.pathname}?c=${active.slug}`,
       );
     }
-
     const onPopState = () => {
       const slug = new URLSearchParams(window.location.search).get("c");
       const target =
@@ -205,6 +253,35 @@ export default function AppShell({
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [selectChannel]);
+
+  const loadOlder = useCallback(async () => {
+    const channel = activeChannel;
+    if (!channel || loadingOlder) return;
+    const list = messagesByChannel[channel.id] ?? [];
+    const oldest = list.find((m) => m.id > 0)?.id;
+    if (!oldest) return;
+
+    setLoadingOlder(true);
+    try {
+      const res = await fetch(
+        `/api/channels/${channel.slug}/messages?before=${oldest}`,
+      );
+      if (!res.ok) throw new Error("load older failed");
+      const { messages, hasMore } = (await res.json()) as {
+        messages: SerializedMessage[];
+        hasMore: boolean;
+      };
+      setMessagesByChannel((prev) => ({
+        ...prev,
+        [channel.id]: [...messages, ...(prev[channel.id] ?? [])],
+      }));
+      setHasMoreByChannel((prev) => ({ ...prev, [channel.id]: hasMore }));
+    } catch {
+      // leave hasMore as-is; user can try again
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [activeChannel, loadingOlder, messagesByChannel]);
 
   // ---- Sending ------------------------------------------------------------
   const sendMessage = useCallback(
@@ -229,6 +306,7 @@ export default function AppShell({
           displayName: currentUser.displayName,
           avatarColor: currentUser.avatarColor,
         },
+        reactions: [],
         pending: true,
         nonce,
       };
@@ -279,6 +357,58 @@ export default function AppShell({
     [activeChannel, sendMessage],
   );
 
+  const deleteMessage = useCallback(async (message: ChatMessage) => {
+    setMessagesByChannel((prev) => ({
+      ...prev,
+      [message.channelId]: (prev[message.channelId] ?? []).filter(
+        (m) => m.id !== message.id,
+      ),
+    }));
+    try {
+      const res = await fetch(`/api/messages/${message.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("delete failed");
+    } catch {
+      setSendError("Couldn't delete that message. Please try again.");
+    }
+  }, []);
+
+  const toggleReaction = useCallback(
+    async (message: ChatMessage, emoji: string) => {
+      if (message.id < 0) return; // not yet confirmed
+      try {
+        const res = await fetch(`/api/messages/${message.id}/reactions`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ emoji }),
+        });
+        if (!res.ok) return;
+        const { reactions } = (await res.json()) as { reactions: ReactionSummary[] };
+        setMessagesByChannel((prev) => ({
+          ...prev,
+          [message.channelId]: (prev[message.channelId] ?? []).map((m) =>
+            m.id === message.id ? { ...m, reactions } : m,
+          ),
+        }));
+      } catch {
+        // ignore — SSE will reconcile if it went through
+      }
+    },
+    [],
+  );
+
+  const sendTyping = useCallback(() => {
+    const channel = activeChannel;
+    if (!channel) return;
+    const now = Date.now();
+    if (now - typingThrottle.current < 2000) return;
+    typingThrottle.current = now;
+    fetch(`/api/channels/${channel.slug}/typing`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    }).catch(() => {});
+  }, [activeChannel]);
+
   const createChannel = useCallback(
     async (name: string, description: string): Promise<string | null> => {
       const res = await fetch("/api/channels", {
@@ -291,13 +421,20 @@ export default function AppShell({
         return data.error ?? "Could not create channel";
       }
       const { channel } = (await res.json()) as { channel: SerializedChannel };
-      // Channel arrives via SSE too, but add immediately for the creator.
       setChannels((prev) =>
         prev.some((c) => c.id === channel.id) ? prev : [...prev, channel],
       );
       setDialogOpen(false);
       await selectChannel(channel);
       return null;
+    },
+    [selectChannel],
+  );
+
+  const jumpToChannel = useCallback(
+    (slug: string) => {
+      const channel = channelsRef.current.find((c) => c.slug === slug);
+      if (channel) void selectChannel(channel);
     },
     [selectChannel],
   );
@@ -315,10 +452,12 @@ export default function AppShell({
     [router],
   );
 
-  const messages = activeChannel
-    ? messagesByChannel[activeChannel.id] ?? []
+  const messages = activeChannel ? messagesByChannel[activeChannel.id] ?? [] : [];
+  // `typing` never contains the current user (SSE ignores own events) and stale
+  // entries are pruned by the interval above, so this is a plain projection.
+  const typingUsers = activeChannel
+    ? Object.values(typing[activeChannel.id] ?? {}).map((t) => t.user)
     : [];
-  const onlineIds = useMemo(() => new Set(online.map((u) => u.id)), [online]);
 
   return (
     <div className="flex h-dvh overflow-hidden bg-paper text-ink">
@@ -327,12 +466,11 @@ export default function AppShell({
         channels={channels}
         activeChannelId={activeChannelId}
         online={online}
-        onlineIds={onlineIds}
         unread={unread}
-        status={status}
         open={sidebarOpen}
         onSelectChannel={selectChannel}
         onNewChannel={() => setDialogOpen(true)}
+        onOpenSearch={() => setSearchOpen(true)}
         onClose={() => setSidebarOpen(false)}
         onLogout={logout}
       />
@@ -391,9 +529,17 @@ export default function AppShell({
         <MessageList
           messages={messages}
           currentUserId={currentUser.id}
+          isAdmin={isAdmin}
           channelName={activeChannel?.name ?? ""}
+          hasMore={activeChannel ? (hasMoreByChannel[activeChannel.id] ?? false) : false}
+          loadingOlder={loadingOlder}
+          onLoadOlder={loadOlder}
+          onReact={toggleReaction}
+          onDelete={deleteMessage}
           onRetry={retryMessage}
         />
+
+        <TypingIndicator users={typingUsers} />
 
         <Composer
           disabled={!activeChannel}
@@ -401,6 +547,7 @@ export default function AppShell({
           error={sendError}
           onClearError={() => setSendError(null)}
           onSend={sendMessage}
+          onTyping={sendTyping}
         />
       </main>
 
@@ -410,6 +557,23 @@ export default function AppShell({
           onClose={() => setDialogOpen(false)}
         />
       )}
+      {searchOpen && (
+        <SearchDialog onJump={jumpToChannel} onClose={() => setSearchOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+function TypingIndicator({ users }: { users: SerializedUser[] }) {
+  let text = "";
+  if (users.length === 1) text = `${users[0].displayName} is typing…`;
+  else if (users.length === 2)
+    text = `${users[0].displayName} and ${users[1].displayName} are typing…`;
+  else if (users.length > 2) text = "Several people are typing…";
+
+  return (
+    <div className="h-5 shrink-0 px-4 text-xs italic text-ink-3" aria-live="polite">
+      {text}
     </div>
   );
 }
