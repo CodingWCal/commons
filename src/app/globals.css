@@ -1,0 +1,123 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ *
+ * Commons design tokens — one system, defined once.
+ * Light values in :root, dark overrides via prefers-color-scheme.
+ * ------------------------------------------------------------------ */
+:root {
+  --paper: #faf8f4; /* page */
+  --paper-2: #ffffff; /* cards / sidebar */
+  --paper-3: #f1ede4; /* wells / composer */
+  --ink: #1c1b18; /* primary text */
+  --ink-2: #57534b; /* secondary text */
+  --ink-3: #8d887d; /* muted text */
+  --rule: #e8e2d6; /* hairline borders */
+  --rule-2: #d9d2c3; /* stronger borders */
+  --commons: #2f6f4f; /* primary accent (green) */
+  --commons-strong: #245c40;
+  --commons-soft: #e3efe7; /* soft fill */
+  --brick: #b4532f; /* secondary accent */
+  --brick-soft: #f6e7df;
+  --danger: #c0392b;
+  --online: #38a169;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #131517;
+    --paper-2: #1b1e21;
+    --paper-3: #23272b;
+    --ink: #f2f0ea;
+    --ink-2: #b6b1a8;
+    --ink-3: #877f76; /* fixed contrast on dark */
+    --rule: #2b2f33;
+    --rule-2: #383d42;
+    --commons: #57b487;
+    --commons-strong: #6fc99d;
+    --commons-soft: #1b2c24;
+    --brick: #e28058;
+    --brick-soft: #2c211c;
+    --danger: #e5745f;
+    --online: #4ade80;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-paper-3: var(--paper-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-2: var(--rule-2);
+  --color-commons: var(--commons);
+  --color-commons-strong: var(--commons-strong);
+  --color-commons-soft: var(--commons-soft);
+  --color-brick: var(--brick);
+  --color-brick-soft: var(--brick-soft);
+  --color-danger: var(--danger);
+  --color-online: var(--online);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  border-color: var(--rule);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Message text should wrap and preserve intentional newlines. */
+.message-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Subtle enter animation for new messages; respects reduced motion. */
+@keyframes message-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-message-in {
+  animation: message-in 140ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-message-in {
+    animation: none;
+  }
+}
+
+/* Themed, thin scrollbars. */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-2) transparent;
+}
+.scroll-thin::-webkit-scrollbar {
+  width: 10px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background-color: var(--rule-2);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
