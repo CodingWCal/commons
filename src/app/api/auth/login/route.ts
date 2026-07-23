@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { loginSchema } from "@/lib/validations";
 import { createSession, verifyPassword } from "@/lib/auth";
+import { assertSameOrigin } from "@/lib/security";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,9 @@ export const runtime = "nodejs";
 const DUMMY_HASH = bcrypt.hashSync("commons-timing-equalizer", 10);
 
 export async function POST(req: Request) {
+  const csrf = assertSameOrigin(req);
+  if (csrf) return csrf;
+
   let json: unknown;
   try {
     json = await req.json();

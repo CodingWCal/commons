@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Avatar from "./Avatar";
 import Logo from "./Logo";
 import type { CurrentUser, SerializedChannel, SerializedUser } from "./chat-types";
@@ -16,7 +17,7 @@ type Props = {
   onSelectChannel: (channel: SerializedChannel) => void;
   onNewChannel: () => void;
   onClose: () => void;
-  onLogout: () => void;
+  onLogout: (scope: "current" | "all") => void;
 };
 
 export default function Sidebar({
@@ -31,6 +32,8 @@ export default function Sidebar({
   onClose,
   onLogout,
 }: Props) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <>
       {/* Mobile backdrop */}
@@ -154,15 +157,55 @@ export default function Sidebar({
             </p>
             <p className="truncate text-xs text-ink-3">{currentUser.email}</p>
           </div>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="rounded-md p-1.5 text-ink-3 hover:bg-paper-3 hover:text-ink"
-            aria-label="Sign out"
-            title="Sign out"
-          >
-            <LogoutIcon />
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((v) => !v)}
+              className="rounded-md p-1.5 text-ink-3 hover:bg-paper-3 hover:text-ink"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-label="Account menu"
+              title="Account"
+            >
+              <LogoutIcon />
+            </button>
+            {menuOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setMenuOpen(false)}
+                  aria-hidden
+                />
+                <div
+                  role="menu"
+                  className="absolute bottom-full right-0 z-50 mb-1 w-52 overflow-hidden rounded-md border border-rule bg-paper-2 py-1 shadow-lg"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onLogout("current");
+                    }}
+                    className="block w-full px-3 py-2 text-left text-sm text-ink hover:bg-paper-3"
+                  >
+                    Sign out
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onLogout("all");
+                    }}
+                    className="block w-full px-3 py-2 text-left text-sm text-ink hover:bg-paper-3"
+                  >
+                    Sign out of all devices
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </aside>
     </>

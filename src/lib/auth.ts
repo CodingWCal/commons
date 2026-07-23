@@ -1,5 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
+import { NextResponse } from "next/server";
 import { createHmac, randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import type { User } from "@prisma/client";
@@ -31,7 +32,17 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
   return bcrypt.compare(plain, hash);
 }
 
+// Best-effort cleanup of expired sessions so the table doesn't grow unbounded
+// (TICKET-004). Called opportunistically on each new session.
+export async function reapExpiredSessions(): Promise<void> {
+  await prisma.session
+    .deleteMany({ where: { expiresAt: { lt: new Date() } } })
+    .catch(() => {});
+}
+
 export async function createSession(userId: string): Promise<void> {
+  void reapExpiredSessions();
+
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
 
@@ -77,6 +88,34 @@ export async function getCurrentUser(): Promise<User | null> {
   }
 
   return session.user;
+}
+
+// Sign out of every device by deleting all of the user's sessions (TICKET-004).
+export async function destroyAllSessions(userId: string): Promise<void> {
+  await prisma.session.deleteMany({ where: { userId } });
+  const jar = await cookies();
+  jar.delete(COOKIE_NAME);
+}
+
+// API-route auth guard. Returns the user, or a 401 response — and clears a
+// stale/invalid session cookie when one was present (TICKET-004). Only call
+// from route handlers (it may set cookies); server components use
+// getCurrentUser directly.
+export async function requireUser(): Promise<
+  { user: User } | { response: NextResponse }
+> {
+  const jar = await cookies();
+  const hadCookie = Boolean(jar.get(COOKIE_NAME));
+  const user = await getCurrentUser();
+
+  if (!user) {
+    if (hadCookie) jar.delete(COOKIE_NAME);
+    return {
+      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    };
+  }
+
+  return { user };
 }
 
 export function toSerializedUser(user: {

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { messageSchema } from "@/lib/validations";
 import { publish } from "@/lib/bus";
 import { allowMessage } from "@/lib/rate-guard";
+import { assertSameOrigin } from "@/lib/security";
 import type { SerializedMessage } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -39,8 +40,8 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
 
   const { slug } = await params;
   const channel = await prisma.channel.findUnique({ where: { slug } });
@@ -71,8 +72,12 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const csrf = assertSameOrigin(req);
+  if (csrf) return csrf;
+
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+  const user = auth.user;
 
   const { slug } = await params;
   const channel = await prisma.channel.findUnique({ where: { slug } });

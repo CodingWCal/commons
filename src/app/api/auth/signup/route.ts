@@ -3,10 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { signupSchema } from "@/lib/validations";
 import { createSession, hashPassword } from "@/lib/auth";
 import { pickAvatarColor } from "@/lib/avatar";
+import { assertSameOrigin } from "@/lib/security";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  const csrf = assertSameOrigin(req);
+  if (csrf) return csrf;
+
   let json: unknown;
   try {
     json = await req.json();

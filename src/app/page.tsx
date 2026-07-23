@@ -15,7 +15,11 @@ function orderChannels<T extends { slug: string; name: string }>(channels: T[]):
   });
 }
 
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ c?: string }>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
@@ -27,7 +31,10 @@ export default async function HomePage() {
     description: c.description,
   }));
 
-  const active = channels[0] ?? null;
+  // Deep-link: open the channel named in ?c=slug, else the first channel.
+  const { c } = await searchParams;
+  const active =
+    (c ? channels.find((ch) => ch.slug === c) : undefined) ?? channels[0] ?? null;
 
   let initialMessages: SerializedMessage[] = [];
   if (active) {

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getCurrentUser } from "@/lib/auth";
+import { requireUser } from "@/lib/auth";
 import { channelSchema } from "@/lib/validations";
 import { slugify } from "@/lib/slug";
 import { publish } from "@/lib/bus";
+import { assertSameOrigin } from "@/lib/security";
 import type { SerializedChannel } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -29,16 +30,20 @@ function orderChannels(channels: ChannelRow[]): ChannelRow[] {
 }
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
 
   const channels = await prisma.channel.findMany();
   return NextResponse.json({ channels: orderChannels(channels).map(serialize) });
 }
 
 export async function POST(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const csrf = assertSameOrigin(req);
+  if (csrf) return csrf;
+
+  const auth = await requireUser();
+  if ("response" in auth) return auth.response;
+  const user = auth.user;
 
   let json: unknown;
   try {

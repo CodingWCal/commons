@@ -92,10 +92,15 @@ export default function AppShell({
   );
   const tempIdRef = useRef(0);
   const activeIdRef = useRef<string | null>(initialActiveChannelId);
+  const channelsRef = useRef<SerializedChannel[]>(initialChannels);
 
   useEffect(() => {
     activeIdRef.current = activeChannelId;
   }, [activeChannelId]);
+
+  useEffect(() => {
+    channelsRef.current = channels;
+  }, [channels]);
 
   const activeChannel = useMemo(
     () => channels.find((c) => c.id === activeChannelId) ?? null,
@@ -147,10 +152,18 @@ export default function AppShell({
 
   // ---- Channel switching --------------------------------------------------
   const selectChannel = useCallback(
-    async (channel: SerializedChannel) => {
+    async (channel: SerializedChannel, pushUrl = true) => {
       setActiveChannelId(channel.id);
       setSidebarOpen(false);
       setUnread((prev) => (prev[channel.id] ? { ...prev, [channel.id]: 0 } : prev));
+
+      if (pushUrl && typeof window !== "undefined") {
+        window.history.pushState(
+          { c: channel.slug },
+          "",
+          `${window.location.pathname}?c=${channel.slug}`,
+        );
+      }
 
       if (loadedChannels.current.has(channel.id)) return;
       loadedChannels.current.add(channel.id);
@@ -168,6 +181,30 @@ export default function AppShell({
     },
     [],
   );
+
+  // Sync active channel with the URL (?c=slug) for deep-linking + back/forward.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const current = new URLSearchParams(window.location.search).get("c");
+    const active = channelsRef.current.find((c) => c.id === activeIdRef.current);
+    if (!current && active) {
+      window.history.replaceState(
+        { c: active.slug },
+        "",
+        `${window.location.pathname}?c=${active.slug}`,
+      );
+    }
+
+    const onPopState = () => {
+      const slug = new URLSearchParams(window.location.search).get("c");
+      const target =
+        (slug ? channelsRef.current.find((c) => c.slug === slug) : null) ??
+        channelsRef.current[0];
+      if (target) void selectChannel(target, false);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [selectChannel]);
 
   // ---- Sending ------------------------------------------------------------
   const sendMessage = useCallback(
@@ -265,11 +302,18 @@ export default function AppShell({
     [selectChannel],
   );
 
-  const logout = useCallback(async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
-    router.refresh();
-  }, [router]);
+  const logout = useCallback(
+    async (scope: "current" | "all" = "current") => {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ scope }),
+      });
+      router.push("/login");
+      router.refresh();
+    },
+    [router],
+  );
 
   const messages = activeChannel
     ? messagesByChannel[activeChannel.id] ?? []
