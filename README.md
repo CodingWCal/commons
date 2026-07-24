@@ -1,5 +1,7 @@
 # Commons
 
+[![CI](https://github.com/CodingWCal/commons/actions/workflows/ci.yml/badge.svg)](https://github.com/CodingWCal/commons/actions/workflows/ci.yml)
+
 **A focused, real-time team chat for the Cursor Boston cohort.**
 Channels, presence, and message history — with the noise turned off.
 
