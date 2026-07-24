@@ -104,7 +104,7 @@ export default function MessageList({
     return (
       <div className="scroll-thin flex flex-1 items-center justify-center overflow-y-auto p-6">
         <div className="text-center">
-          <p className="text-lg font-medium text-ink">
+          <p className="font-display text-2xl text-ink">
             {!channelName
               ? "No channel selected"
               : isDm

@@ -54,16 +54,16 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
       {/* Brand panel */}
-      <div className="relative hidden flex-col justify-between bg-commons p-12 text-white lg:flex">
+      <div className="relative hidden flex-col justify-between bg-brand p-12 text-white lg:flex">
         <div className="flex items-center gap-3">
           <Logo size={40} />
-          <span className="text-xl font-semibold tracking-tight">Commons</span>
+          <span className="font-display text-2xl">Commons</span>
         </div>
         <div className="max-w-md">
-          <p className="text-3xl font-semibold leading-tight">
+          <p className="font-display text-4xl leading-[1.1]">
             One calm room for the cohort.
           </p>
-          <p className="mt-4 text-white/80">
+          <p className="mt-5 text-white/80">
             Channels, presence, and history — real-time, focused, and free of the
             noise. Built for Cursor Boston.
           </p>
@@ -76,12 +76,10 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
             <Logo size={36} />
-            <span className="text-lg font-semibold tracking-tight text-ink">
-              Commons
-            </span>
+            <span className="font-display text-xl text-ink">Commons</span>
           </div>
 
-          <h1 className="text-2xl font-semibold tracking-tight text-ink">
+          <h1 className="font-display text-3xl text-ink">
             {isSignup ? "Join the Commons" : "Welcome back"}
           </h1>
           <p className="mt-1 text-sm text-ink-2">
@@ -144,7 +142,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
             <button
               type="submit"
               disabled={pending}
-              className="flex w-full items-center justify-center rounded-md bg-commons px-4 py-2.5 font-medium text-white transition-colors hover:bg-commons-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-commons disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center justify-center rounded-md bg-commons px-4 py-2.5 font-medium text-on-commons transition-colors hover:bg-commons-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-commons disabled:cursor-not-allowed disabled:opacity-60"
             >
               {pending
                 ? "Just a moment…"

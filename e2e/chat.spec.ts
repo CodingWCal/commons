@@ -98,6 +98,23 @@ test("direct messages are private and delivered in real time", async ({ browser 
   await ctxC.close();
 });
 
+test("mobile: the sidebar opens as an off-canvas drawer", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await signup(page, `Mobile ${RUN}`, `mobile+${RUN}@example.com`);
+
+  const aside = page.locator("aside");
+  // Off-screen initially (drawer closed).
+  expect((await aside.boundingBox())!.x).toBeLessThan(0);
+
+  await page.getByRole("button", { name: "Open channel list" }).click();
+  // Slides fully into view.
+  await expect.poll(async () => (await aside.boundingBox())!.x).toBe(0);
+
+  // And closes again.
+  await page.getByRole("button", { name: "Close channel list" }).click();
+  await expect.poll(async () => (await aside.boundingBox())!.x).toBeLessThan(0);
+});
+
 test("messages persist across a reload", async ({ page }) => {
   await signup(page, "Persist User", `persist+${RUN}@example.com`);
 

@@ -94,7 +94,7 @@ export default function Composer({
             type="button"
             onClick={submit}
             disabled={disabled || value.trim().length === 0}
-            className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-commons text-white transition-colors hover:bg-commons-strong disabled:cursor-not-allowed disabled:opacity-40"
+            className="mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-commons text-on-commons transition-colors hover:bg-commons-strong disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Send message"
           >
             <SendIcon />

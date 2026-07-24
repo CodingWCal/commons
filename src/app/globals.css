@@ -10,12 +10,14 @@
   --paper-3: #f1ede4; /* wells / composer */
   --ink: #1c1b18; /* primary text */
   --ink-2: #57534b; /* secondary text */
-  --ink-3: #8d887d; /* muted text */
+  --ink-3: #726d63; /* muted text (AA-legible on paper) */
   --rule: #e8e2d6; /* hairline borders */
   --rule-2: #d9d2c3; /* stronger borders */
   --commons: #2f6f4f; /* primary accent (green) */
   --commons-strong: #245c40;
   --commons-soft: #e3efe7; /* soft fill */
+  --on-commons: #ffffff; /* text/icon color that sits on a --commons fill */
+  --brand: #285f43; /* fixed deep green for the brand panel (both themes) */
   --brick: #b4532f; /* secondary accent */
   --brick-soft: #f6e7df;
   --danger: #c0392b;
@@ -29,12 +31,13 @@
     --paper-3: #23272b;
     --ink: #f2f0ea;
     --ink-2: #b6b1a8;
-    --ink-3: #877f76; /* fixed contrast on dark */
+    --ink-3: #969084; /* AA-legible muted on dark */
     --rule: #2b2f33;
     --rule-2: #383d42;
     --commons: #57b487;
     --commons-strong: #6fc99d;
     --commons-soft: #1b2c24;
+    --on-commons: #0f231a; /* dark text on the lighter dark-mode green */
     --brick: #e28058;
     --brick-soft: #2c211c;
     --danger: #e5745f;
@@ -54,6 +57,8 @@
   --color-commons: var(--commons);
   --color-commons-strong: var(--commons-strong);
   --color-commons-soft: var(--commons-soft);
+  --color-on-commons: var(--on-commons);
+  --color-brand: var(--brand);
   --color-brick: var(--brick);
   --color-brick-soft: var(--brick-soft);
   --color-danger: var(--danger);
@@ -61,6 +66,7 @@
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-fraunces);
 }
 
 * {
@@ -77,6 +83,36 @@ body {
   color: var(--ink);
   font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--commons-soft);
+  color: var(--commons-strong);
+}
+
+/* Sidebar as an off-canvas drawer on mobile, static column on desktop.
+   Uses `transform` (transitionable) rather than Tailwind's `translate`
+   utilities, which don't reliably toggle here. */
+.sidebar-drawer {
+  position: fixed;
+  transform: translateX(-100%);
+}
+.sidebar-drawer[data-open="true"] {
+  transform: translateX(0);
+}
+@media (min-width: 1024px) {
+  .sidebar-drawer {
+    position: static;
+    transform: none;
+  }
+}
+
+/* Editorial display face for the wordmark + headings. */
+.font-display {
+  font-family: var(--font-serif), Georgia, "Times New Roman", serif;
+  letter-spacing: -0.01em;
+  font-weight: 500;
 }
 
 /* Message text should wrap and preserve intentional newlines. */

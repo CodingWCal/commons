@@ -124,7 +124,7 @@ export default function NewChannelDialog({ onCreate, onClose }: Props) {
             <button
               type="submit"
               disabled={pending || !name.trim()}
-              className="rounded-md bg-commons px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-commons-strong disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-md bg-commons px-4 py-2 text-sm font-medium text-on-commons transition-colors hover:bg-commons-strong disabled:cursor-not-allowed disabled:opacity-60"
             >
               {pending ? "Creating…" : "Create channel"}
             </button>

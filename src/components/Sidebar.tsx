@@ -51,15 +51,14 @@ export default function Sidebar({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-rule bg-paper-2 transition-transform duration-200 lg:static lg:translate-x-0 ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
+        data-open={open ? "true" : "false"}
+        className="sidebar-drawer inset-y-0 left-0 z-30 flex w-64 flex-col border-r border-rule bg-paper-2"
       >
         {/* Workspace header */}
         <div className="flex h-14 shrink-0 items-center gap-2.5 border-b border-rule px-4">
           <Logo size={28} />
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold leading-tight text-ink">
+            <p className="font-display truncate text-lg leading-tight text-ink">
               Commons
             </p>
             <p className="truncate text-xs leading-tight text-ink-3">
