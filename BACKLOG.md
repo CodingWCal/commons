@@ -267,7 +267,7 @@ creation, presence, validation/negative paths, rate limiting).
 
 ### TICKET-007: Moderation & roles — delete/edit own messages, admin controls
 
-> ✅ **Done** (delete + roles) — `User.role` (first signup becomes admin), soft-delete via `DELETE /api/messages/:id` (author or admin), live removal through the `message-delete` SSE event, delete affordance in `MessageItem`. Verified live + Playwright permission test. (Message *editing* deferred.)
+> ✅ **Done** — `User.role` (first signup becomes admin), soft-delete via `DELETE /api/messages/:id` (author or admin), live removal through the `message-delete` SSE event. **Message editing** added: author-only `PATCH /api/messages/:id` sets `editedAt`, propagates live via a `message-update` SSE event, with an inline editor + "(edited)" label in `MessageItem`. Verified live + Playwright permission tests (delete + edit).
 
 - Priority: P1
 - Type: Feature

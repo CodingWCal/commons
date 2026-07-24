@@ -15,6 +15,7 @@ type Props = {
   onLoadOlder: () => void;
   onReact: (message: ChatMessage, emoji: string) => void;
   onDelete: (message: ChatMessage) => void;
+  onEdit: (message: ChatMessage, body: string) => Promise<boolean>;
   onRetry: (message: ChatMessage) => void;
 };
 
@@ -43,6 +44,7 @@ export default function MessageList({
   onLoadOlder,
   onReact,
   onDelete,
+  onEdit,
   onRetry,
 }: Props) {
   const label = isDm ? channelName : `#${channelName}`;
@@ -174,6 +176,7 @@ export default function MessageList({
                   grouped={grouped}
                   onReact={(emoji) => onReact(message, emoji)}
                   onDelete={() => onDelete(message)}
+                  onEdit={(body) => onEdit(message, body)}
                   onRetry={() => onRetry(message)}
                 />
               </div>

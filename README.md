@@ -25,8 +25,8 @@ database. No accounts, no API keys, no external services required to run it.
 - 🟢 **Presence & typing** — see who's online (ref-counted across tabs) and
   "X is typing…" indicators, all live.
 - 😀 **Reactions** — toggle emoji reactions; counts update live for everyone.
-- 🛡️ **Moderation & roles** — the first member becomes admin; authors delete
-  their own messages, admins delete any (soft delete, removed live).
+- 🛡️ **Moderation & roles** — the first member becomes admin; authors edit and
+  delete their own messages (edits show "(edited)" live), admins delete any.
 - ✉️ **Direct messages** — private 1:1 conversations (membership-enforced,
   audience-scoped so only the two participants receive them). Start one by
   clicking someone in the online list.

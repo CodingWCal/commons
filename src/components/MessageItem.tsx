@@ -12,6 +12,7 @@ type Props = {
   grouped: boolean;
   onReact: (emoji: string) => void;
   onDelete: () => void;
+  onEdit: (body: string) => Promise<boolean>;
   onRetry: () => void;
 };
 
@@ -26,13 +27,28 @@ export default function MessageItem({
   grouped,
   onReact,
   onDelete,
+  onEdit,
   onRetry,
 }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  const canDelete =
-    !message.pending &&
-    !message.failed &&
-    (message.user.id === currentUserId || isAdmin);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(message.body);
+  const [saving, setSaving] = useState(false);
+  const isOwn = message.user.id === currentUserId;
+  const canDelete = !message.pending && !message.failed && (isOwn || isAdmin);
+  const canEdit = !message.pending && !message.failed && isOwn;
+
+  async function saveEdit() {
+    const next = draft.trim();
+    if (!next || next === message.body) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    const ok = await onEdit(next);
+    setSaving(false);
+    if (ok) setEditing(false);
+  }
 
   return (
     <div
@@ -67,13 +83,60 @@ export default function MessageItem({
           </div>
         )}
 
-        <p
-          className={`message-body animate-message-in text-sm leading-relaxed ${
-            message.failed ? "text-danger" : "text-ink"
-          } ${message.pending ? "opacity-60" : ""}`}
-        >
-          {message.body}
-        </p>
+        {editing ? (
+          <div className="mt-1">
+            <textarea
+              autoFocus
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void saveEdit();
+                } else if (e.key === "Escape") {
+                  setDraft(message.body);
+                  setEditing(false);
+                }
+              }}
+              rows={2}
+              className="w-full resize-none rounded-md border border-rule-2 bg-paper px-2 py-1.5 text-sm text-ink focus-visible:border-commons focus-visible:outline-none"
+            />
+            <div className="mt-1 flex items-center gap-2 text-xs">
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void saveEdit()}
+                className="rounded bg-commons px-2 py-1 font-medium text-on-commons hover:bg-commons-strong disabled:opacity-60"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(message.body);
+                  setEditing(false);
+                }}
+                className="rounded px-2 py-1 text-ink-2 hover:bg-paper-3"
+              >
+                Cancel
+              </button>
+              <span className="text-ink-3">Enter to save · Esc to cancel</span>
+            </div>
+          </div>
+        ) : (
+          <p
+            className={`message-body animate-message-in text-sm leading-relaxed ${
+              message.failed ? "text-danger" : "text-ink"
+            } ${message.pending ? "opacity-60" : ""}`}
+          >
+            {message.body}
+            {message.editedAt && (
+              <span className="ml-1.5 align-baseline text-xs text-ink-3">
+                (edited)
+              </span>
+            )}
+          </p>
+        )}
 
         {message.pending && <span className="text-xs text-ink-3">Sending…</span>}
         {message.failed && (
@@ -117,7 +180,7 @@ export default function MessageItem({
       </div>
 
       {/* Hover actions */}
-      {!message.pending && !message.failed && (
+      {!message.pending && !message.failed && !editing && (
         <div className="absolute right-2 top-0 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-rule bg-paper-2 p-0.5 shadow-sm group-hover:flex">
           <div className="relative">
             <button
@@ -155,6 +218,20 @@ export default function MessageItem({
               </>
             )}
           </div>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(message.body);
+                setEditing(true);
+              }}
+              className="rounded p-1 text-ink-3 hover:bg-paper-3 hover:text-ink"
+              aria-label="Edit message"
+              title="Edit message"
+            >
+              <PencilIcon />
+            </button>
+          )}
           {canDelete && (
             <button
               type="button"
@@ -181,6 +258,19 @@ function SmileIcon() {
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 20h4l10.5-10.5a2.12 2.12 0 00-3-3L5 17v3z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
       />
     </svg>
   );

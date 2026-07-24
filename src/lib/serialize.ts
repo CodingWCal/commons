@@ -7,6 +7,7 @@ type MessageRow = {
   body: string;
   channelId: string;
   createdAt: Date;
+  editedAt?: Date | null;
   user: { id: string; displayName: string; avatarColor: string };
   reactions?: ReactionRow[];
 };
@@ -32,6 +33,7 @@ export function serializeMessage(m: MessageRow): SerializedMessage {
     body: m.body,
     channelId: m.channelId,
     createdAt: m.createdAt.toISOString(),
+    editedAt: m.editedAt ? m.editedAt.toISOString() : null,
     user: {
       id: m.user.id,
       displayName: m.user.displayName,

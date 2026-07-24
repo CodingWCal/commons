@@ -206,3 +206,29 @@ test("search finds a message by its content", async ({ playwright }) => {
 
   await ctx.dispose();
 });
+
+test("only the author can edit a message; edits set editedAt", async ({ playwright }) => {
+  const author = await newSignedInCtx(playwright, `editor+${RUN}@example.com`);
+  const other = await newSignedInCtx(playwright, `editorother+${RUN}@example.com`);
+  const id = await postMessage(author, `original ${RUN}`);
+
+  // A non-author cannot edit.
+  const forbidden = await other.patch(`/api/messages/${id}`, {
+    headers: { origin: BASE },
+    data: { body: "hijacked" },
+  });
+  expect(forbidden.status()).toBe(403);
+
+  // The author can, and editedAt is set.
+  const res = await author.patch(`/api/messages/${id}`, {
+    headers: { origin: BASE },
+    data: { body: `edited ${RUN}` },
+  });
+  expect(res.status()).toBe(200);
+  const data = (await res.json()) as { message: { body: string; editedAt: string | null } };
+  expect(data.message.body).toBe(`edited ${RUN}`);
+  expect(data.message.editedAt).not.toBeNull();
+
+  await author.dispose();
+  await other.dispose();
+});

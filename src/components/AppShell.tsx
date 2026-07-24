@@ -130,6 +130,19 @@ export default function AppShell({
       }
     });
 
+    es.addEventListener("message-update", (e) => {
+      const { channelId, message } = JSON.parse((e as MessageEvent).data) as {
+        channelId: string;
+        message: SerializedMessage;
+      };
+      setMessagesByChannel((prev) => ({
+        ...prev,
+        [channelId]: (prev[channelId] ?? []).map((m) =>
+          m.id === message.id ? { ...m, ...message } : m,
+        ),
+      }));
+    });
+
     es.addEventListener("message-delete", (e) => {
       const { channelId, messageId } = JSON.parse((e as MessageEvent).data) as {
         channelId: string;
@@ -316,6 +329,7 @@ export default function AppShell({
         body,
         channelId: channel.id,
         createdAt: new Date().toISOString(),
+        editedAt: null,
         user: {
           id: currentUser.id,
           displayName: currentUser.displayName,
@@ -400,6 +414,33 @@ export default function AppShell({
       setSendError("Couldn't delete that message. Please try again.");
     }
   }, []);
+
+  const editMessage = useCallback(
+    async (message: ChatMessage, body: string): Promise<boolean> => {
+      try {
+        const res = await fetch(`/api/messages/${message.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ body }),
+        });
+        if (!res.ok) throw new Error("edit failed");
+        const { message: updated } = (await res.json()) as {
+          message: SerializedMessage;
+        };
+        setMessagesByChannel((prev) => ({
+          ...prev,
+          [message.channelId]: (prev[message.channelId] ?? []).map((m) =>
+            m.id === updated.id ? { ...m, ...updated } : m,
+          ),
+        }));
+        return true;
+      } catch {
+        setSendError("Couldn't edit that message. Please try again.");
+        return false;
+      }
+    },
+    [],
+  );
 
   const toggleReaction = useCallback(
     async (message: ChatMessage, emoji: string) => {
@@ -594,6 +635,7 @@ export default function AppShell({
           onLoadOlder={loadOlder}
           onReact={toggleReaction}
           onDelete={deleteMessage}
+          onEdit={editMessage}
           onRetry={retryMessage}
         />
 

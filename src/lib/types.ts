@@ -18,6 +18,7 @@ export type SerializedMessage = {
   body: string;
   channelId: string;
   createdAt: string;
+  editedAt: string | null;
   user: SerializedUser;
   reactions: ReactionSummary[];
 };
@@ -41,6 +42,12 @@ export type BusEvent =
       channelId: string;
       message: SerializedMessage;
       nonce?: string;
+      audience?: string[];
+    }
+  | {
+      type: "message-update";
+      channelId: string;
+      message: SerializedMessage;
       audience?: string[];
     }
   | { type: "message-delete"; channelId: string; messageId: number; audience?: string[] }

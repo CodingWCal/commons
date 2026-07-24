@@ -67,6 +67,11 @@ export async function GET(req: Request) {
 
         if (event.type === "message") {
           sendMessage(event.channelId, event.message, event.nonce);
+        } else if (event.type === "message-update") {
+          sendEvent("message-update", {
+            channelId: event.channelId,
+            message: event.message,
+          });
         } else if (event.type === "message-delete") {
           sendEvent("message-delete", {
             channelId: event.channelId,
